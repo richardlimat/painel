@@ -5,6 +5,13 @@
   --muted: #6b7280;
   --line: #e5e7eb;
   --accent: #111827;
+  /* cores dos elementos do grafo (nós, conexões e legenda) */
+  --blue: #1671f9;
+  --green: #18a568;
+  --amber: #f5a12c;
+  --purple: #8257e6;
+  --orange: #ff762a;
+  --red: #f04e57;
   --panel: #fff;
   --canvas: #ffffff;
   --canvas-text: #1f2937;
@@ -333,15 +340,15 @@
 .crumb {
   position: absolute;
   z-index: 6;
-  top: 22px;
-  left: 30px;
+  /* abaixo do controle de camadas (canto superior esquerdo) */
+  top: 60px;
+  left: 16px;
   color: #374151;
   font-size: 11px;
   display: flex;
   gap: 9px;
   align-items: center;
-  /* para antes do controle de camadas centralizado */
-  max-width: calc(50% - 110px);
+  max-width: 60%;
   overflow-x: auto;
   white-space: nowrap;
 }
@@ -369,20 +376,22 @@
   padding: 5px 10px;
   background: var(--canvas);
 }
-/* ─── Controle de camadas: [ − ] Camada N [ + ] ─── */
+/* ─── Controle de camadas: [ − ] Camada N [ + ] (azul, canto superior esquerdo) ─── */
 .layer-control {
   position: absolute;
-  z-index: 8;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
+  z-index: 10;
+  top: 16px;
+  left: 16px;
+  right: auto;
+  transform: none;
   display: flex;
   align-items: center;
   gap: 2px;
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 9px;
-  box-shadow: 0 4px 15px rgba(17, 24, 39, 0.08);
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid #2563eb;
+  border-radius: 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.14);
   padding: 3px;
 }
 .layer-control button {
@@ -391,37 +400,39 @@
   border: 0;
   border-radius: 7px;
   background: transparent;
-  color: #1f2937;
+  color: #ffffff;
   font-size: 17px;
   font-weight: 700;
   display: grid;
   place-items: center;
   line-height: 1;
+  cursor: pointer;
 }
 .layer-control button:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: #1d4ed8;
 }
 .layer-control button:disabled {
-  opacity: 0.35;
-  cursor: default;
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 .layer-control .layer-label {
   min-width: 86px;
   text-align: center;
   font-size: 12px;
   font-weight: 700;
-  color: #111827;
+  color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
   padding: 0 6px;
+  border-inline: 1px solid rgba(255, 255, 255, 0.25);
 }
 .layer-spinner {
   width: 11px;
   height: 11px;
   border-radius: 50%;
-  border: 2px solid #9ca3af;
+  border: 2px solid #ffffff;
   border-top-color: transparent;
   animation: rf-spin 0.8s linear infinite;
   flex: none;
@@ -785,7 +796,7 @@
   stroke-linejoin: round;
 }
 #reactflow-root .react-flow__edge:hover .react-flow__edge-path {
-  stroke: #111827 !important;
+  stroke: #1671f9 !important;
   stroke-width: 2.6 !important;
 }
 .rf-entity {
@@ -822,7 +833,7 @@
   box-shadow: 0 0 0 3px #fff, 0 7px 17px rgba(17,24,39,.2);
 }
 .rf-entity.is-selected .rf-circle {
-  box-shadow: 0 0 0 3px #fff, 0 0 0 6px #9ca3af, 0 8px 22px rgba(17,24,39,.16);
+  box-shadow: 0 0 0 3px #fff, 0 0 0 6px #8db9ff, 0 8px 22px #1671f940;
 }
 .rf-entity.closed .rf-circle {
   border-style: dashed;
@@ -864,9 +875,9 @@
 .rf-label em {
   font-size: 8px;
   font-style: normal;
-  color: #374151;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
+  color: #e77b00;
+  background: #fff7eb;
+  border: 1px solid #f3ae4f;
   border-radius: 10px;
   padding: 2px 7px;
   margin-top: 4px;
@@ -914,7 +925,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  border: 2px solid #d1d5db;
+  border: 2px solid #f3ae4f;
   border-top-color: transparent;
   background: #fff;
   animation: rf-spin 0.8s linear infinite;
@@ -930,7 +941,7 @@
   font-size: 10px;
   font-weight: 650;
   background: #fff;
-  border: 1px solid #d1d5db;
+  border: 1px solid #cdd7e4;
   border-radius: 5px;
   padding: 2px 6px;
   filter: drop-shadow(0 1px 2px rgba(17,24,39,.06));

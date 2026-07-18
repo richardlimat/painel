@@ -13,7 +13,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useGraphStore } from '../../store/graphStore';
 import { applyFilters, degreeMap } from '../../lib/filtering';
-import { LINK_COLORS, RELATION_LABELS, ROOT_VISUAL, nodeKindClass, nodeVisual } from '../../lib/colors';
+import { LINK_COLORS, NODE_COLORS, RELATION_LABELS, nodeColor, nodeKindClass } from '../../lib/colors';
 import { formatCNPJ } from '../../lib/format';
 import { placeAround, radialLayout, type XY } from '../../lib/flowLayout';
 import type { GraphNode } from '../../types/graph';
@@ -61,7 +61,7 @@ function FlowCanvasInner() {
       const capitalBoost = capital > 0 ? Math.min(6, Math.log10(capital) / 2) : 0;
       const base = n.kind === 'company' ? 34 : 30;
       const radius = isRoot ? 50 : Math.min(46, Math.round(base + Math.min(10, deg * 1.1) + capitalBoost));
-      const visual = isRoot ? ROOT_VISUAL : nodeVisual(n);
+      const matrizAtiva = n.company?.matriz === true && n.company?.situacao === 'ATIVA';
       return {
         id: n.id,
         type: 'entity',
@@ -70,9 +70,8 @@ function FlowCanvasInner() {
         data: {
           kind: nodeKindClass(n),
           isPerson: n.kind === 'person',
-          bg: visual.bg,
-          fg: visual.fg,
-          border: visual.border,
+          color: nodeColor(n),
+          ring: isRoot ? '#0d63e8' : matrizAtiva && !isRoot ? NODE_COLORS.matriz : undefined,
           radius,
           label: n.label,
           subLabel: n.company?.nomeFantasia,
@@ -232,7 +231,7 @@ function FlowCanvasInner() {
         proOptions={{ hideAttribution: true }}
         colorMode={theme}
       >
-        <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#e5e7eb" />
+        <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#d5dde8" />
         <Controls showInteractive={false} position="bottom-left" />
       </ReactFlow>
     </div>

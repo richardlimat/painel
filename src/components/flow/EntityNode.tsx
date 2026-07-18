@@ -5,9 +5,8 @@ import { CompanyIcon, PersonIcon } from './icons';
 export interface EntityNodeData extends Record<string, unknown> {
   kind: string; // classes: company | person | closed | branch | inactive | matrix | admin
   isPerson: boolean;
-  bg: string;
-  fg: string;
-  border: string;
+  color: string;
+  ring?: string;
   radius: number;
   label: string;
   subLabel?: string;
@@ -36,7 +35,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps<EntityFlowNode>) =
     >
       <Handle type="target" id="t" position={Position.Top} className="rf-port" isConnectable={false} />
       <Handle type="source" id="s" position={Position.Top} className="rf-port" isConnectable={false} />
-      <div className="rf-circle" style={{ background: data.bg, borderColor: data.border, color: data.fg }}>
+      <div className="rf-circle" style={{ background: data.color, borderColor: data.ring ?? data.color }}>
         {data.isPerson ? <PersonIcon /> : <CompanyIcon />}
         {!data.expanded && !data.expanding && <span className="rf-expand">+</span>}
         {data.expanding && <span className="rf-loading" />}

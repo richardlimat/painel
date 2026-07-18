@@ -1,63 +1,27 @@
 import type { GraphNode, RelationType } from '../types/graph';
 
-// ─── Identidade visual neutra (branco/grafite/cinza — sem azul) ───────────────
-
-export interface NodeVisual {
-  bg: string;
-  fg: string;
-  border: string;
-}
-
-export const NEUTRAL = {
-  ink: '#111827', // preto-grafite
-  graphite: '#374151',
-  gray: '#6b7280',
-  grayLight: '#9ca3af',
-  grayLighter: '#d1d5db',
-  surface: '#f3f4f6',
-  white: '#ffffff',
+// ─── Identidade visual dos nós (paleta do painel) ─────────────────────────────────
+export const NODE_COLORS = {
+  company: '#1671f9', // azul — empresa ativa
+  companyRing: '#0d63e8',
+  person: '#18a568', // verde — pessoa
+  inactive: '#a7adb7', // cinza — empresa inativa (suspensa/inapta/nula)
+  baixada: '#f04e57', // vermelho — empresa baixada
+  admin: '#f5a12c', // amarelo — administrador
+  matriz: '#8257e6', // roxo — empresa matriz (destaque)
+  filial: '#ff762a', // laranja — empresa filial
 } as const;
 
-/**
- * Aparência do nó: empresas e pessoas se diferenciam por preenchimento,
- * borda e ícone — nunca por cor azul.
- */
-export function nodeVisual(node: GraphNode): NodeVisual {
-  if (node.kind === 'person') {
-    // pessoa: círculo branco com ícone grafite (administrador tem borda mais escura)
-    return node.person?.administrador
-      ? { bg: NEUTRAL.white, fg: NEUTRAL.ink, border: '#4b5563' }
-      : { bg: NEUTRAL.white, fg: NEUTRAL.graphite, border: NEUTRAL.grayLight };
-  }
-  const c = node.company;
-  if (c?.situacao === 'BAIXADA') {
-    // baixada: contorno tracejado (classe .closed) e tons apagados
-    return { bg: NEUTRAL.white, fg: NEUTRAL.grayLight, border: NEUTRAL.grayLight };
-  }
-  if (c?.situacao === 'SUSPENSA' || c?.situacao === 'INAPTA' || c?.situacao === 'NULA') {
-    return { bg: '#e5e7eb', fg: NEUTRAL.gray, border: NEUTRAL.grayLight };
-  }
-  if (c?.matriz === false) {
-    // filial: cinza médio
-    return { bg: NEUTRAL.gray, fg: NEUTRAL.white, border: '#4b5563' };
-  }
-  // empresa ativa: grafite escuro preenchido com ícone branco
-  return { bg: NEUTRAL.graphite, fg: NEUTRAL.white, border: '#1f2937' };
-}
-
-/** Visual da empresa pesquisada (raiz) */
-export const ROOT_VISUAL: NodeVisual = { bg: NEUTRAL.ink, fg: NEUTRAL.white, border: '#000000' };
-
-// ─── Cores por tipo de relacionamento (tons neutros) ──────────────────────────
+// ─── Cores por tipo de relacionamento ─────────────────────────────────────────
 export const LINK_COLORS: Record<RelationType, string> = {
-  SOCIO: '#4b5563',
-  ADMINISTRADOR: '#1f2937',
-  REPRESENTANTE_LEGAL: '#6b7280',
-  CONTROLADORA: '#111827',
-  CONTROLADA: '#374151',
-  FILIAL: '#9ca3af',
-  MATRIZ: '#374151',
-  PARTICIPACAO: '#6b7280',
+  SOCIO: '#1671f9', // azul
+  ADMINISTRADOR: '#18a568', // verde
+  REPRESENTANTE_LEGAL: '#14b8a6', // teal
+  CONTROLADORA: '#f04e57', // vermelho
+  CONTROLADA: '#d63a44',
+  FILIAL: '#ff762a', // laranja
+  MATRIZ: '#8257e6',
+  PARTICIPACAO: '#8257e6', // roxo
 };
 
 export const RELATION_LABELS: Record<RelationType, string> = {
@@ -70,6 +34,18 @@ export const RELATION_LABELS: Record<RelationType, string> = {
   MATRIZ: 'Matriz de',
   PARTICIPACAO: 'Participação',
 };
+
+export function nodeColor(node: GraphNode): string {
+  if (node.kind === 'person') {
+    return node.person?.administrador ? NODE_COLORS.admin : NODE_COLORS.person;
+  }
+  const c = node.company;
+  if (!c) return NODE_COLORS.company;
+  if (c.situacao === 'BAIXADA') return NODE_COLORS.baixada;
+  if (c.situacao === 'SUSPENSA' || c.situacao === 'INAPTA' || c.situacao === 'NULA') return NODE_COLORS.inactive;
+  if (c.matriz === false) return NODE_COLORS.filial;
+  return NODE_COLORS.company;
+}
 
 /** Classes CSS do nó do mapa (rf-entity) */
 export function nodeKindClass(node: GraphNode): string {
@@ -85,12 +61,12 @@ export function nodeKindClass(node: GraphNode): string {
   return parts.join(' ');
 }
 
-export const NODE_LEGEND: { visual: NodeVisual; label: string; dashed?: boolean }[] = [
-  { visual: { bg: NEUTRAL.graphite, fg: NEUTRAL.white, border: '#1f2937' }, label: 'Empresa ativa' },
-  { visual: { bg: NEUTRAL.white, fg: NEUTRAL.graphite, border: NEUTRAL.grayLight }, label: 'Pessoa (CPF)' },
-  { visual: { bg: NEUTRAL.white, fg: NEUTRAL.ink, border: '#4b5563' }, label: 'Administrador' },
-  { visual: { bg: '#e5e7eb', fg: NEUTRAL.gray, border: NEUTRAL.grayLight }, label: 'Empresa inativa' },
-  { visual: { bg: NEUTRAL.white, fg: NEUTRAL.grayLight, border: NEUTRAL.grayLight }, label: 'Empresa baixada', dashed: true },
-  { visual: { bg: NEUTRAL.gray, fg: NEUTRAL.white, border: '#4b5563' }, label: 'Filial' },
-  { visual: { bg: NEUTRAL.ink, fg: NEUTRAL.white, border: '#000' }, label: 'Empresa pesquisada' },
+export const NODE_LEGEND = [
+  { color: NODE_COLORS.company, label: 'Empresa ativa' },
+  { color: NODE_COLORS.person, label: 'Pessoa (CPF)' },
+  { color: NODE_COLORS.admin, label: 'Administrador' },
+  { color: NODE_COLORS.inactive, label: 'Empresa inativa' },
+  { color: NODE_COLORS.baixada, label: 'Empresa baixada' },
+  { color: NODE_COLORS.filial, label: 'Filial' },
+  { color: NODE_COLORS.matriz, label: 'Matriz (destaque)' },
 ];
