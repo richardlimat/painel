@@ -28,7 +28,10 @@ Os nós do grafo são DOM (React Flow), seletor `.rf-entity`:
 
 1. Preencher `#cnpj` com `12.345.678/0001-90`, submeter → `page.waitForSelector('.rf-entity')`.
 2. Clique simples em `.rf-entity` → seleciona e abre `.details.open`; DUPLO clique → expande.
-   Controle de camadas: `.layer-control` (− / "Camada N" / +) sobreposto ao topo do mapa.
+   Controle de camadas: `.layer-control` (− / "Camada N" / +) no canto superior esquerdo.
+   Forças: `.map-config-btn` abre painel com sliders `input[aria-label="Força de repulsão"]`
+   etc.; simulação d3-force roda ~3–4s após mudança (debounce 300ms). Limpar
+   `localStorage['painel-forcas']` antes de testes que dependem dos padrões.
 3. `button:has-text("Expandir Tudo")` → rede cresce em ondas (esperar ~8s até estabilizar).
 4. Painéis: `button:has-text("Estatísticas")` (painel direito, abas Indicadores/Linha do tempo),
    filtros na sidebar esquerda (`.filter-row`, `.range`).

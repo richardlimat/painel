@@ -3,6 +3,7 @@ import { useGraphStore } from '../../store/graphStore';
 import { computeStats } from '../../lib/filtering';
 import { FlowCanvas } from '../flow/FlowCanvas';
 import { LayerControl } from './LayerControl';
+import { MapConfig } from './MapConfig';
 
 export function Workspace({ workspaceRef }: { workspaceRef: React.RefObject<HTMLDivElement> }) {
   const nodes = useGraphStore((s) => s.nodes);
@@ -30,6 +31,7 @@ export function Workspace({ workspaceRef }: { workspaceRef: React.RefObject<HTML
     <main className="workspace" ref={workspaceRef}>
       <FlowCanvas />
       <LayerControl />
+      <MapConfig />
       {breadcrumb.length > 0 && (
         <div className="crumb" aria-label="Trilha de navegação">
           {breadcrumb.map((id, i) => {

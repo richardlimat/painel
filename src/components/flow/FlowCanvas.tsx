@@ -16,6 +16,7 @@ import { applyFilters, degreeMap } from '../../lib/filtering';
 import { LINK_COLORS, NODE_COLORS, RELATION_LABELS, nodeColor, nodeKindClass } from '../../lib/colors';
 import { formatCNPJ } from '../../lib/format';
 import { placeAround, radialLayout, type XY } from '../../lib/flowLayout';
+import { ForceRefiner, type SimNode } from '../../lib/forceSim';
 import type { GraphNode } from '../../types/graph';
 import { EntityNode, type EntityFlowNode } from './EntityNode';
 import { FloatingEdge, type FloatingFlowEdge } from './FloatingEdge';
@@ -37,13 +38,26 @@ function FlowCanvasInner() {
   const highlightedNodeId = useGraphStore((s) => s.highlightedNodeId);
   const focusRequest = useGraphStore((s) => s.focusRequest);
   const organizeRequest = useGraphStore((s) => s.organizeRequest);
+  const forceSettings = useGraphStore((s) => s.forceSettings);
+  const forceCustomized = useGraphStore((s) => s.forceCustomized);
+  const animateRequest = useGraphStore((s) => s.animateRequest);
   const selectNode = useGraphStore((s) => s.selectNode);
   const expandNode = useGraphStore((s) => s.expandNode);
 
-  const { fitView } = useReactFlow();
+  const { fitView, getViewport } = useReactFlow();
   const positionsRef = useRef(new Map<string, XY>());
   const prevRootRef = useRef<string | null>(null);
   const [rfNodes, setRfNodes] = useState<EntityFlowNode[]>([]);
+
+  // refs para a simulação de forças (painel "Configurar mapa")
+  const simRef = useRef<ForceRefiner | null>(null);
+  const rfNodesRef = useRef<EntityFlowNode[]>([]);
+  rfNodesRef.current = rfNodes;
+  const settingsRef = useRef(forceSettings);
+  settingsRef.current = forceSettings;
+  const customizedRef = useRef(forceCustomized);
+  customizedRef.current = forceCustomized;
+  const runSimRef = useRef<() => void>(() => {});
 
   // camadas cumulativas: exibe apenas nós até a camada atual do controle
   const visible = useMemo(() => {
@@ -140,16 +154,28 @@ function FlowCanvasInner() {
     }
 
     setRfNodes(visible.nodes.map((n) => buildRfNode(n, pos.get(n.id)!)));
+
+    // com forças personalizadas, novos nós disparam o refinamento automático
+    if (newcomers.length > 0 && customizedRef.current) {
+      const t = setTimeout(() => runSimRef.current(), 150);
+      return () => clearTimeout(t);
+    }
   }, [visible, rootId, buildRfNode, fitView]);
 
-  // Reorganizar: re-executa o layout radial completo
+  // Reorganizar: re-executa o layout radial completo; com forças personalizadas,
+  // o refinamento por simulação roda em seguida usando os valores do painel
   useEffect(() => {
     if (organizeRequest === 0) return;
+    simRef.current?.stop();
     const layout = radialLayout(visible.nodes, visible.links, rootId);
     const pos = positionsRef.current;
     layout.forEach((p, id) => pos.set(id, p));
     setRfNodes((prev) => prev.map((n) => ({ ...n, position: pos.get(n.id) ?? n.position })));
     setTimeout(() => fitView({ padding: 0.16, duration: 500 }), 40);
+    if (customizedRef.current) {
+      const t = setTimeout(() => runSimRef.current(), 550);
+      return () => clearTimeout(t);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [organizeRequest]);
 
@@ -158,6 +184,88 @@ function FlowCanvasInner() {
     if (!focusRequest) return;
     fitView({ nodes: [{ id: focusRequest.nodeId }], maxZoom: 1.55, duration: 500 });
   }, [focusRequest, fitView]);
+
+  // ─── Simulação de forças (refinamento estilo Obsidian) ──────────────────────
+
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+
+  /** Enquadra suavemente apenas se algum nó saiu da área visível */
+  const fitIfOutOfView = useCallback(() => {
+    const pane = document.querySelector('#reactflow-root');
+    if (!pane) return;
+    const { width, height } = pane.getBoundingClientRect();
+    const { x, y, zoom } = getViewport();
+    const view = { x0: -x / zoom, y0: -y / zoom, x1: (-x + width) / zoom, y1: (-y + height) / zoom };
+    const margin = 40;
+    const out = rfNodesRef.current.some(
+      (n) =>
+        n.position.x < view.x0 - margin ||
+        n.position.x > view.x1 + margin ||
+        n.position.y < view.y0 - margin ||
+        n.position.y > view.y1 + margin,
+    );
+    if (out) fitView({ padding: 0.16, duration: 500 });
+  }, [getViewport, fitView]);
+
+  /**
+   * Roda a simulação a partir das posições atuais. Interrompe qualquer
+   * simulação anterior; atualiza somente x/y (IDs e dados intactos).
+   */
+  const runSimulation = useCallback(() => {
+    simRef.current?.stop();
+    const pos = positionsRef.current;
+    const current = rfNodesRef.current;
+    if (current.length < 2) return;
+    const simNodes: SimNode[] = current.map((n) => ({
+      id: n.id,
+      x: pos.get(n.id)?.x ?? n.position.x,
+      y: pos.get(n.id)?.y ?? n.position.y,
+      radius: n.data.radius,
+    }));
+    const simLinks = visibleRef.current.links.map((l) => ({ source: nid(l.source), target: nid(l.target) }));
+    const refiner = new ForceRefiner(simNodes, simLinks, settingsRef.current);
+    simRef.current = refiner;
+    refiner.start(
+      (ns) => {
+        const byId = new Map(ns.map((n) => [n.id, n]));
+        for (const n of ns) pos.set(n.id, { x: n.x ?? 0, y: n.y ?? 0 });
+        setRfNodes((prev) =>
+          prev.map((n) => {
+            const s = byId.get(n.id);
+            return s ? { ...n, position: { x: s.x ?? 0, y: s.y ?? 0 } } : n;
+          }),
+        );
+      },
+      () => fitIfOutOfView(),
+    );
+  }, [fitIfOutOfView]);
+  runSimRef.current = runSimulation;
+
+  // slider movido → debounce curto, sem fitView a cada passo
+  const settingsTouched = useRef(false);
+  useEffect(() => {
+    if (!settingsTouched.current) {
+      settingsTouched.current = true;
+      return; // primeira renderização (inclusive valores vindos do localStorage)
+    }
+    const t = setTimeout(() => runSimulation(), 300);
+    return () => clearTimeout(t);
+  }, [forceSettings, runSimulation]);
+
+  // botão "Animar"
+  useEffect(() => {
+    if (animateRequest === 0) return;
+    runSimulation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animateRequest]);
+
+  // simulação nunca briga com o arrasto manual
+  const onNodeDragStart = useCallback(() => {
+    simRef.current?.stop();
+  }, []);
+
+  useEffect(() => () => simRef.current?.stop(), []);
 
   const rfEdges = useMemo<FloatingFlowEdge[]>(() => {
     const nodeById = new Map(visible.nodes.map((n) => [n.id, n]));
@@ -220,6 +328,7 @@ function FlowCanvasInner() {
         onNodesChange={onNodesChange}
         onNodeClick={onNodeClick}
         onNodeDoubleClick={onNodeDoubleClick}
+        onNodeDragStart={onNodeDragStart}
         onPaneClick={() => selectNode(null)}
         zoomOnDoubleClick={false}
         fitView

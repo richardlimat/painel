@@ -11,6 +11,13 @@ import type {
 import { defaultFilters } from '../types/graph';
 import { onlyDigits } from '../lib/format';
 import type { DataProvider } from '../services/provider';
+import {
+  FORCE_DEFAULTS,
+  clearForceSettings,
+  loadForceSettings,
+  saveForceSettings,
+  type ForceSettings,
+} from '../lib/forceSim';
 import { ReverseLookupUnsupportedError } from '../services/provider';
 import { BrasilApiProvider } from '../services/brasilapi';
 import { DemoProvider } from '../services/demoProvider';
@@ -52,6 +59,12 @@ interface GraphState {
   panelMode: 'entity' | 'stats';
   /** incrementado a cada reset/recolhimento — cancela expansões em andamento */
   graphEpoch: number;
+  /** forças do layout (painel "Configurar mapa"), escala 0–100 */
+  forceSettings: ForceSettings;
+  /** true quando o usuário personalizou as forças (ativa o refinamento automático) */
+  forceCustomized: boolean;
+  /** incrementado pelo botão "Animar" */
+  animateRequest: number;
   theme: 'light' | 'dark';
 
   setProviderMode: (m: ProviderMode) => void;
@@ -63,6 +76,9 @@ interface GraphState {
   focusNode: (id: string) => void;
   selectNode: (id: string | null) => void;
   requestOrganize: () => void;
+  setForceSettings: (s: Partial<ForceSettings>) => void;
+  resetForceSettings: () => void;
+  requestAnimate: () => void;
   setPanelMode: (m: 'entity' | 'stats') => void;
   notify: (msg: string) => void;
   clearNotice: () => void;
@@ -219,6 +235,8 @@ function mergePersonResult(state: GraphState, result: PersonLookupResult, depth:
   return { nodes: [...nodeIndex.values()], links, timeline };
 }
 
+const initialForce = loadForceSettings();
+
 export const useGraphStore = create<GraphState>((set, get) => ({
   providerMode: 'demo',
   providers: { demo: new DemoProvider(), brasilapi: new BrasilApiProvider() },
@@ -243,6 +261,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   organizeRequest: 0,
   panelMode: 'entity',
   graphEpoch: 0,
+  forceSettings: initialForce.settings,
+  forceCustomized: initialForce.customized,
+  animateRequest: 0,
   theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
 
   setProviderMode: (m) => set({ providerMode: m }),
@@ -268,6 +289,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     });
   },
   requestOrganize: () => set((s) => ({ organizeRequest: s.organizeRequest + 1 })),
+  setForceSettings: (partial) =>
+    set((s) => {
+      const next = { ...s.forceSettings, ...partial };
+      saveForceSettings(next);
+      return { forceSettings: next, forceCustomized: true };
+    }),
+  resetForceSettings: () => {
+    clearForceSettings();
+    set({ forceSettings: { ...FORCE_DEFAULTS }, forceCustomized: false });
+    // volta ao layout radial puro, sem zoom brusco (organize já faz fitView suave)
+    get().requestOrganize();
+  },
+  requestAnimate: () => set((s) => ({ animateRequest: s.animateRequest + 1 })),
   setPanelMode: (m) => set({ panelMode: m }),
   notify: (msg) => set({ notice: msg }),
   clearNotice: () => set({ notice: null }),

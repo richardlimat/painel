@@ -33,6 +33,12 @@ baixadas têm contorno tracejado e filiais usam cinza médio.
 - **Expansão individual**: clique simples seleciona (painel de detalhes); **duplo
   clique** expande as conexões do nó. Botões **Expandir Tudo** (BFS até o limite de
   níveis, com teto de segurança de 600 nós) e **Recolher Tudo**.
+- **Configurar mapa** (⚙, abaixo do controle de camadas): painel retrátil de forças
+  estilo Obsidian — força centrípeta, repulsão, força e distância dos links (escala
+  0–100, d3-force) — que refina as posições geradas pelo layout radial, com botões
+  **Animar** e **Restaurar padrão** e persistência em localStorage. Com valores
+  padrão a simulação não roda e o layout permanece o radial puro; personalizado,
+  o refinamento se aplica automaticamente a novas camadas e expansões.
 - **Limite de camadas configurável**: 2, 3, 5, 10 ou ilimitado; entidades já visitadas
   são deduplicadas (anti-loop).
 - **Identidade visual**: empresas ativas em azul, pessoas em verde, administradores em
