@@ -3,7 +3,7 @@ export const config = { runtime: 'edge' };
 /** Testável isoladamente (ver api/cadastro-pj-plus.test.ts) */
 export function buildFonteDataUrl(cnpj: string): URL {
   const url = new URL('https://app.fontedata.com/api/v1/consulta/cadastro-pj-plus');
-  url.searchParams.set('CNPJ', cnpj);
+  url.searchParams.set('cnpj', cnpj); // case-sensitive na FonteData — minúsculo, confirmado na doc deles
   return url;
 }
 
