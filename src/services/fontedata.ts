@@ -60,7 +60,7 @@ interface FonteDataCadastroPjPlus {
   socios?: FonteDataSocio[];
 }
 
-function mapStatus(s?: string): CompanyStatus {
+export function mapStatus(s?: string): CompanyStatus {
   const v = (s ?? '').toUpperCase();
   if (v.includes('ATIVA')) return 'ATIVA';
   if (v.includes('BAIXADA')) return 'BAIXADA';
@@ -70,7 +70,7 @@ function mapStatus(s?: string): CompanyStatus {
   return 'DESCONHECIDA';
 }
 
-function mapRelation(cargo: string): RelationType {
+export function mapRelation(cargo: string): RelationType {
   const c = cargo.toUpperCase();
   if (c.includes('ADMINISTRADOR')) return 'ADMINISTRADOR';
   if (c.includes('REPRESENTANTE')) return 'REPRESENTANTE_LEGAL';
@@ -78,8 +78,8 @@ function mapRelation(cargo: string): RelationType {
   return 'SOCIO';
 }
 
-/** Converte "DD/MM/YYYY HH:mm:ss" (formato FonteData) para ISO "YYYY-MM-DD" */
-function parseBrDate(v?: string): string | undefined {
+/** Converte "DD/MM/YYYY HH:mm:ss" (formato FonteData/APIFull) para ISO "YYYY-MM-DD" */
+export function parseBrDate(v?: string): string | undefined {
   if (!v) return undefined;
   const [datePart] = v.split(' ');
   const [day, month, year] = (datePart ?? '').split('/');

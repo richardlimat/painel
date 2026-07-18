@@ -4,7 +4,7 @@ import type {
   GraphFilters,
   GraphLink,
   GraphNode,
-  PersonLookupResult,
+  RelationshipMeta,
   RelationType,
   TimelineEvent,
 } from '../types/graph';
@@ -18,8 +18,9 @@ import {
   saveForceSettings,
   type ForceSettings,
 } from '../lib/forceSim';
-import { ReverseLookupUnsupportedError } from '../services/provider';
-import { FonteDataProvider } from '../services/fontedata';
+import { FonteDataProvider, mapRelation, mapStatus, parseBrDate } from '../services/fontedata';
+import { extractSociedades, type ApiFullSociedade } from '../services/apifull';
+import { usePersonProfileStore } from './personProfileStore';
 
 export type ProviderMode = 'fontedata';
 
@@ -30,6 +31,10 @@ const linkId = (source: string, target: string, type: RelationType) => `${source
 
 /** Limite de segurança para o "Expandir Tudo" não explodir a renderização */
 const EXPAND_ALL_NODE_CAP = 600;
+/** Quantos CNPJs de sociedades[] são enriquecidos na FonteData por vez, por pessoa */
+const SOCIEDADES_BATCH_SIZE = 4;
+/** Teto de consultas NOVAS à APIFull (sem contar cache) numa execução de "Expandir Tudo" — proteção de custo */
+const MAX_APIFULL_CALLS_PER_EXPAND_ALL = 25;
 
 interface GraphState {
   providerMode: ProviderMode;
@@ -96,18 +101,68 @@ function pushEvent(timeline: TimelineEvent[], ev: TimelineEvent) {
   timeline.push(ev);
 }
 
-/** Mescla o resultado de uma consulta de CNPJ no grafo (mutação controlada + novos arrays) */
-function mergeCompanyResult(state: GraphState, result: CompanyLookupResult, depth: number) {
+/** Preenche campos vazios/ausentes de `a` com os de `b`, sem sobrescrever um valor válido. */
+function mergeMeta(a: RelationshipMeta, b: RelationshipMeta): RelationshipMeta {
+  const pick = <K extends keyof RelationshipMeta>(key: K): RelationshipMeta[K] => {
+    const av = a[key];
+    return av === undefined || av === null || av === '' ? b[key] : av;
+  };
+  return {
+    percentual: pick('percentual'),
+    dataEntrada: pick('dataEntrada'),
+    situacao: pick('situacao'),
+    origem: pick('origem'),
+    funcao: pick('funcao'),
+  };
+}
+
+/**
+ * Adiciona uma relação ou mescla com uma já existente entre o mesmo par
+ * (source, target) — independente do `type`. Evita aresta duplicada quando
+ * a mesma relação pessoa↔empresa é informada por duas fontes diferentes
+ * (ex.: APIFull cria a relação primeiro, FonteData chega depois com a
+ * mesma pessoa) com qualificações que mapeiam pra tipos diferentes.
+ */
+function addOrMergeLink(links: GraphLink[], source: string, target: string, type: RelationType, meta: RelationshipMeta) {
+  const existingIdx = links.findIndex((l) => {
+    const s = typeof l.source === 'string' ? l.source : l.source.id;
+    const t = typeof l.target === 'string' ? l.target : l.target.id;
+    return s === source && t === target;
+  });
+  if (existingIdx >= 0) {
+    links[existingIdx] = { ...links[existingIdx], meta: mergeMeta(links[existingIdx].meta, meta) };
+    return;
+  }
+  links.push({ id: linkId(source, target, type), source, target, type, meta });
+}
+
+/**
+ * Mescla o resultado de uma consulta de CNPJ no grafo (mutação controlada +
+ * novos arrays). `opts.partnerDepth` permite colocar a empresa e seus sócios
+ * na MESMA camada — usado quando a empresa foi descoberta via
+ * `sociedades[]` de uma pessoa (empresa e sócios entram juntos na camada
+ * seguinte à da pessoa, não em camadas separadas). Sem `opts`, mantém o
+ * comportamento padrão (sócios uma camada abaixo da empresa) usado na busca
+ * inicial e na expansão normal de uma empresa.
+ */
+function mergeCompanyResult(
+  state: GraphState,
+  result: CompanyLookupResult,
+  depth: number,
+  opts?: { partnerDepth?: number },
+) {
   const { nodeIndex } = state;
   const links = [...state.links];
-  const linkIds = new Set(links.map((l) => l.id));
   const timeline = [...state.timeline];
+  const partnerDepth = opts?.partnerDepth ?? depth + 1;
 
   const cId = companyId(result.company.cnpj);
   let cNode = nodeIndex.get(cId);
   if (!cNode) {
     cNode = { id: cId, kind: 'company', label: result.company.razaoSocial, depth, expanded: false };
     nodeIndex.set(cId, cNode);
+  } else {
+    cNode.depth = Math.min(cNode.depth, depth);
   }
   cNode.company = result.company;
   cNode.label = result.company.razaoSocial;
@@ -119,25 +174,25 @@ function mergeCompanyResult(state: GraphState, result: CompanyLookupResult, dept
     nodeId: cId,
   });
 
-  const addLink = (source: string, target: string, type: RelationType, meta: GraphLink['meta']) => {
-    const id = linkId(source, target, type);
-    if (linkIds.has(id)) return;
-    linkIds.add(id);
-    links.push({ id, source, target, type, meta });
-  };
-
   for (const p of result.partners) {
     if (p.person) {
       const pId = personId(p.person.cpf || p.person.nome);
       let pNode = nodeIndex.get(pId);
       if (!pNode) {
-        pNode = { id: pId, kind: 'person', label: p.person.nome, depth: depth + 1, expanded: false, person: p.person };
+        pNode = {
+          id: pId,
+          kind: 'person',
+          label: p.person.nome,
+          depth: partnerDepth,
+          expanded: false,
+          person: p.person,
+        };
         nodeIndex.set(pId, pNode);
       } else {
-        pNode.depth = Math.min(pNode.depth, depth + 1);
+        pNode.depth = Math.min(pNode.depth, partnerDepth);
         if (p.person.administrador) pNode.person = { ...pNode.person!, administrador: true };
       }
-      addLink(pId, cId, p.relation, p.meta);
+      addOrMergeLink(links, pId, cId, p.relation, p.meta);
       pushEvent(timeline, {
         date: p.meta.dataEntrada ?? '',
         kind: p.meta.situacao === 'RETIRADO' ? 'saida_socio' : 'entrada_socio',
@@ -155,13 +210,15 @@ function mergeCompanyResult(state: GraphState, result: CompanyLookupResult, dept
           id: pjId,
           kind: 'company',
           label: p.company.razaoSocial,
-          depth: depth + 1,
+          depth: partnerDepth,
           expanded: false,
           company: { cnpj: onlyDigits(p.company.cnpj), razaoSocial: p.company.razaoSocial, situacao: 'DESCONHECIDA' },
         };
         nodeIndex.set(pjId, pjNode);
+      } else {
+        pjNode.depth = Math.min(pjNode.depth, partnerDepth);
       }
-      addLink(pjId, cId, p.relation, p.meta);
+      addOrMergeLink(links, pjId, cId, p.relation, p.meta);
     }
   }
 
@@ -172,66 +229,158 @@ function mergeCompanyResult(state: GraphState, result: CompanyLookupResult, dept
         id: bId,
         kind: 'company',
         label: `${b.razaoSocial} (Filial)`,
-        depth: depth + 1,
+        depth: partnerDepth,
         expanded: false,
         company: { cnpj: onlyDigits(b.cnpj), razaoSocial: b.razaoSocial, situacao: 'DESCONHECIDA', matriz: false },
       });
     }
-    addLink(bId, cId, 'FILIAL', { origem: 'Cadastro', situacao: 'ATIVA' });
+    addOrMergeLink(links, bId, cId, 'FILIAL', { origem: 'Cadastro', situacao: 'ATIVA' });
   }
 
   return { nodes: [...nodeIndex.values()], links, timeline };
 }
 
-function mergePersonResult(state: GraphState, result: PersonLookupResult, depth: number) {
+/**
+ * Cria/atualiza imediatamente a relação Pessoa→Empresa informada pela
+ * própria APIFull (`sociedades[]`), com um nó de empresa "placeholder" se
+ * ainda não existir. Roda ANTES da chamada à FonteData — se a FonteData não
+ * devolver essa pessoa entre os sócios (bases desatualizadas entre si), a
+ * relação informada pela APIFull continua no grafo.
+ */
+function mergeApiFullSociedadeRelation(state: GraphState, personNode: GraphNode, s: ApiFullSociedade, depth: number) {
   const { nodeIndex } = state;
   const links = [...state.links];
-  const linkIds = new Set(links.map((l) => l.id));
-  const timeline = [...state.timeline];
 
-  const pId = personId(result.person.cpf || result.person.nome);
-  const pNode = nodeIndex.get(pId);
-  if (pNode) pNode.expanded = true;
-
-  for (const c of result.companies) {
-    const cId = companyId(c.company.cnpj);
-    let cNode = nodeIndex.get(cId);
-    if (!cNode) {
-      cNode = {
-        id: cId,
-        kind: 'company',
-        label: c.company.razaoSocial,
-        depth: depth + 1,
-        expanded: false,
-        company: {
-          cnpj: onlyDigits(c.company.cnpj),
-          razaoSocial: c.company.razaoSocial,
-          situacao: c.company.situacao ?? 'DESCONHECIDA',
-          uf: c.company.uf,
-          municipio: c.company.municipio,
-        },
-      };
-      nodeIndex.set(cId, cNode);
-    } else {
-      cNode.depth = Math.min(cNode.depth, depth + 1);
-    }
-    const id = linkId(pId, cId, c.relation);
-    if (!linkIds.has(id)) {
-      linkIds.add(id);
-      links.push({ id, source: pId, target: cId, type: c.relation, meta: c.meta });
-    }
-    pushEvent(timeline, {
-      date: c.meta.dataEntrada ?? '',
-      kind: c.meta.situacao === 'RETIRADO' ? 'saida_socio' : 'entrada_socio',
-      description:
-        c.meta.situacao === 'RETIRADO'
-          ? `Saída de ${result.person.nome} de ${c.company.razaoSocial}`
-          : `Entrada de ${result.person.nome} em ${c.company.razaoSocial}`,
-      nodeId: pId,
-    });
+  const cId = companyId(s.cnpj);
+  let cNode = nodeIndex.get(cId);
+  if (!cNode) {
+    cNode = {
+      id: cId,
+      kind: 'company',
+      label: s.razaoSocial || s.cnpj,
+      depth,
+      expanded: false,
+      company: {
+        cnpj: s.cnpj,
+        razaoSocial: s.razaoSocial || '(razão social pendente)',
+        situacao: mapStatus(s.situacaoCadastral),
+      },
+    };
+    nodeIndex.set(cId, cNode);
+  } else {
+    cNode.depth = Math.min(cNode.depth, depth);
   }
 
-  return { nodes: [...nodeIndex.values()], links, timeline };
+  const relation = mapRelation(s.qualificacaoSocioDescricao ?? '');
+  addOrMergeLink(links, personNode.id, cId, relation, {
+    dataEntrada: parseBrDate(s.dtEntrada),
+    situacao: s.situacaoCadastral || 'ATIVO',
+    origem: 'APIFull / sociedades',
+    funcao: s.qualificacaoSocioDescricao,
+  });
+
+  return { nodes: [...nodeIndex.values()], links };
+}
+
+/**
+ * Processa em lotes pequenos (Promise.allSettled) os CNPJs de `sociedades[]`
+ * ainda não expandidos no grafo, enriquecendo cada um via FonteData
+ * (empresa completa + todos os seus sócios, na mesma camada `targetDepth`).
+ * Uma falha individual não cancela as demais. Retorna quantas tiveram
+ * sucesso/falharam nesta chamada — chamar de novo (mesmo nó) reprocessa só
+ * as que ainda não estão expandidas (as bem-sucedidas já ficam marcadas
+ * `expanded` no grafo e não são reconsultadas).
+ */
+async function processPendingSociedades(
+  get: () => GraphState,
+  set: (partial: Partial<GraphState> | ((s: GraphState) => Partial<GraphState>)) => void,
+  cpf: string,
+  cnpjs: string[],
+  targetDepth: number,
+  epoch: number,
+): Promise<{ succeededCount: number; failedCount: number }> {
+  let succeededCount = 0;
+  let failedCount = 0;
+  for (let i = 0; i < cnpjs.length; i += SOCIEDADES_BATCH_SIZE) {
+    if (get().graphEpoch !== epoch) break;
+    const batch = cnpjs.slice(i, i + SOCIEDADES_BATCH_SIZE);
+    const results = await Promise.allSettled(batch.map((cnpj) => get().providers.fontedata.getCompany(cnpj)));
+    if (get().graphEpoch !== epoch) break;
+    results.forEach((res, idx) => {
+      const cnpj = batch[idx];
+      if (res.status === 'fulfilled') {
+        succeededCount += 1;
+        set(mergeCompanyResult(get(), res.value, targetDepth, { partnerDepth: targetDepth }));
+        usePersonProfileStore.getState().markSociedadeOutcome(cpf, cnpj, 'succeeded');
+      } else {
+        failedCount += 1;
+        usePersonProfileStore.getState().markSociedadeOutcome(cpf, cnpj, 'failed');
+      }
+    });
+  }
+  return { succeededCount, failedCount };
+}
+
+/**
+ * Expande um nó pessoa: perfil completo via APIFull (cache/dedup real em
+ * `personProfileStore`, compartilhado com o clique no painel) → relação
+ * imediata por `sociedades[]` → enriquecimento em lote via FonteData. Só
+ * marca `node.expanded = true` quando não sobra CNPJ pendente nem falho —
+ * numa falha parcial o nó permanece clicável para tentar de novo (reaproveita
+ * o perfil em cache e só reprocessa os CNPJs que ainda faltam).
+ */
+async function expandPersonViaProfile(
+  get: () => GraphState,
+  set: (partial: Partial<GraphState> | ((s: GraphState) => Partial<GraphState>)) => void,
+  node: GraphNode,
+): Promise<void> {
+  const cpf = onlyDigits(node.person?.cpf ?? '');
+  const targetDepth = node.depth + 1;
+  const epoch = get().graphEpoch;
+
+  let profile;
+  try {
+    profile = await usePersonProfileStore.getState().loadProfile(cpf);
+  } catch (e) {
+    if (get().graphEpoch !== epoch) return;
+    set({
+      notice: `Falha ao carregar perfil de ${node.person?.nome ?? cpf}: ${e instanceof Error ? e.message : 'erro desconhecido'}`,
+    });
+    return; // node.expanded fica false — permite tentar de novo
+  }
+  if (get().graphEpoch !== epoch) return;
+
+  const sociedades = extractSociedades(profile);
+  if (sociedades.length === 0) {
+    node.expanded = true;
+    set({ nodes: [...get().nodeIndex.values()] });
+    return;
+  }
+
+  // 1. Relação Empresa→Pessoa imediata por sociedade, com base só na APIFull
+  // (não depende da FonteData responder — ver mergeApiFullSociedadeRelation).
+  for (const s of sociedades) {
+    set(mergeApiFullSociedadeRelation(get(), node, s, targetDepth));
+  }
+  if (get().graphEpoch !== epoch) return;
+
+  // 2. Enriquecimento via FonteData só dos CNPJs ainda não expandidos no grafo.
+  const pendingCnpjs = [...new Set(sociedades.map((s) => s.cnpj))].filter(
+    (cnpj) => !get().nodeIndex.get(companyId(cnpj))?.expanded,
+  );
+  usePersonProfileStore.getState().setSociedadesStatus(cpf, { pending: pendingCnpjs, succeeded: [], failed: [] });
+
+  const { failedCount } = await processPendingSociedades(get, set, cpf, pendingCnpjs, targetDepth, epoch);
+  if (get().graphEpoch !== epoch) return;
+
+  if (failedCount === 0) {
+    node.expanded = true;
+    set({ nodes: [...get().nodeIndex.values()] });
+  } else {
+    set({
+      notice: `Expansão parcial: ${failedCount} de ${pendingCnpjs.length} empresa(s) falharam ao consultar ${node.person?.nome ?? cpf}. Clique de novo para tentar essas empresas.`,
+    });
+  }
 }
 
 const initialForce = loadForceSettings();
@@ -348,22 +497,15 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         const merged = mergeCompanyResult(get(), result, node.depth);
         set(merged);
       } else {
-        const result = await provider.getPersonCompanies(node.person!.cpf, node.person!.nome);
+        await expandPersonViaProfile(get, set, node);
         if (get().graphEpoch !== epoch) return;
-        const merged = mergePersonResult(get(), result, node.depth);
-        set(merged);
       }
       // expansão manual (duplo clique / painel): garante que os filhos fiquem visíveis
       if (!opts?.force && node.depth + 1 > get().currentLayer) {
         set({ currentLayer: node.depth + 1 });
       }
     } catch (e) {
-      if (e instanceof ReverseLookupUnsupportedError) {
-        node.expanded = true;
-        set({ notice: e.message, nodes: [...get().nodeIndex.values()] });
-      } else {
-        set({ error: e instanceof Error ? e.message : 'Erro ao expandir nó' });
-      }
+      set({ error: e instanceof Error ? e.message : 'Erro ao expandir nó' });
     } finally {
       set((s) => {
         const next = new Set(s.expandingIds);
@@ -374,21 +516,44 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   expandAll: async () => {
-    const { maxDepth, graphEpoch } = get();
+    const { maxDepth, graphEpoch, nodeIndex } = get();
+    const pendingPeopleCount = [...nodeIndex.values()].filter(
+      (n) => n.kind === 'person' && !n.expanded && n.depth < maxDepth,
+    ).length;
+    if (pendingPeopleCount > 0) {
+      // "Expandir Tudo" pode disparar uma cascata de consultas pagas (APIFull + FonteData)
+      // — confirmação explícita antes de gastar créditos sem o usuário pedir uma pessoa por vez.
+      const confirmed = window.confirm(
+        `"Expandir Tudo" vai consultar a APIFull para ${pendingPeopleCount} pessoa(s) (e possivelmente novas empresas na FonteData) — isso consome créditos pagos das duas APIs e pode continuar em cascata por várias camadas. Deseja continuar?`,
+      );
+      if (!confirmed) return;
+    }
+
+    let apiFullCallsThisRun = 0;
     set({ loading: true, notice: null });
     // BFS: expande em ondas até o limite de profundidade ou o teto de nós
     for (let round = 0; round < 50; round++) {
       if (get().graphEpoch !== graphEpoch) break; // cancelado por recolher/reset
-      const { nodeIndex, expandingIds } = get();
-      if (nodeIndex.size >= EXPAND_ALL_NODE_CAP) {
+      const { nodeIndex: idx, expandingIds } = get();
+      if (idx.size >= EXPAND_ALL_NODE_CAP) {
         set({ notice: `Expansão interrompida ao atingir ${EXPAND_ALL_NODE_CAP} nós (limite de segurança).` });
         break;
       }
-      const pending = [...nodeIndex.values()]
+      if (apiFullCallsThisRun >= MAX_APIFULL_CALLS_PER_EXPAND_ALL) {
+        set({
+          notice: `Expansão interrompida após ${MAX_APIFULL_CALLS_PER_EXPAND_ALL} consultas novas à APIFull nesta execução (limite de custo). Use "+" para continuar manualmente.`,
+        });
+        break;
+      }
+      const pending = [...idx.values()]
         .filter((n) => !n.expanded && n.depth < maxDepth && !expandingIds.has(n.id))
         .sort((a, b) => a.depth - b.depth)
         .slice(0, 8);
       if (pending.length === 0) break;
+      const profilesByCpf = usePersonProfileStore.getState().profilesByCpf;
+      apiFullCallsThisRun += pending.filter(
+        (n) => n.kind === 'person' && !profilesByCpf.has(onlyDigits(n.person?.cpf ?? '')),
+      ).length;
       await Promise.all(pending.map((n) => get().expandNode(n.id)));
     }
     set({ loading: false });
