@@ -92,6 +92,42 @@ function formatEndereco(e?: FonteDataEndereco): string | undefined {
   return [e.logradouro, e.numero, e.bairro].filter(Boolean).join(', ') || undefined;
 }
 
+/** Extrai a mensagem de erro do corpo da resposta (JSON ou texto), quando houver */
+export async function extractErrorDetail(res: Response): Promise<string | undefined> {
+  try {
+    const body = await res.clone().json();
+    const msg = body?.message ?? body?.mensagem ?? body?.erro ?? body?.error ?? body;
+    if (msg == null) return undefined;
+    return typeof msg === 'string' ? msg : JSON.stringify(msg);
+  } catch {
+    try {
+      const text = await res.clone().text();
+      return text || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+}
+
+/** Mensagem amigável por status HTTP (sempre com o detalhe real do corpo anexado, quando houver) */
+function messageForStatus(status: number, detail: string | undefined): string {
+  const suffix = detail ? ` Detalhe: ${detail}` : '';
+  switch (status) {
+    case 400:
+      return `CNPJ ou parâmetro inválido.${suffix}`;
+    case 401:
+    case 403:
+      return `Chave de API da FonteData ausente ou inválida (configuração do servidor).${suffix}`;
+    case 402:
+      return `Saldo insuficiente na conta FonteData.${suffix}`;
+    case 429:
+      return `Limite de requisições da FonteData excedido. Tente novamente em instantes.${suffix}`;
+    default:
+      if (status >= 500 && status <= 503) return `FonteData indisponível no momento.${suffix}`;
+      return `Falha na consulta FonteData (HTTP ${status})${suffix}`;
+  }
+}
+
 /**
  * Provedor baseado na FonteData (https://fontedata.com), API comercial de
  * dados cadastrais de pessoas jurídicas. Suporta consulta de CNPJ + QSA;
@@ -99,21 +135,45 @@ function formatEndereco(e?: FonteDataEndereco): string | undefined {
  */
 export class FonteDataProvider implements DataProvider {
   readonly name = 'FonteData';
+  /** Cache por CNPJ normalizado: evita cobrar duas vezes o mesmo documento
+   * mesmo quando ele é descoberto por dois caminhos diferentes do grafo
+   * quase ao mesmo tempo. Sobrevive a reset/recolher do grafo (dura a
+   * instância do provider, criada uma única vez em graphStore). */
+  private companyCache = new Map<string, Promise<CompanyLookupResult>>();
 
   async getCompany(cnpj: string): Promise<CompanyLookupResult> {
     const digits = onlyDigits(cnpj);
-    const apiKey = import.meta.env.VITE_FONTEDATA_API_KEY as string | undefined;
-    const res = await fetch(
-      `https://app.fontedata.com/api/v1/consulta/cadastro-pj-plus?CNPJ=${digits}`,
-      { headers: { 'X-API-Key': apiKey ?? '' } },
-    );
-    if (res.status === 404) throw new CompanyNotFoundError(cnpj);
-    if (res.status === 401 || res.status === 403) {
-      throw new Error('Chave de API da FonteData ausente ou inválida (VITE_FONTEDATA_API_KEY).');
+    if (!/^\d{14}$/.test(digits)) {
+      throw new Error('CNPJ inválido: informe exatamente 14 dígitos.');
     }
-    if (!res.ok) throw new Error(`Falha na consulta FonteData (HTTP ${res.status})`);
-    const data = (await res.json()) as FonteDataCadastroPjPlus;
-    if (!data.cnpj) throw new CompanyNotFoundError(cnpj);
+    const cacheKey = `cadastro-pj-plus:${digits}`;
+    const cached = this.companyCache.get(cacheKey);
+    if (cached) return cached;
+
+    const promise = this.fetchCompany(digits).catch((err) => {
+      this.companyCache.delete(cacheKey); // erro não fica em cache — permite nova tentativa
+      throw err;
+    });
+    this.companyCache.set(cacheKey, promise);
+    return promise;
+  }
+
+  private async fetchCompany(digits: string): Promise<CompanyLookupResult> {
+    // Chamada same-origin: o proxy em api/cadastro-pj-plus.ts repassa para a
+    // FonteData no servidor, evitando CORS e mantendo a chave fora do bundle.
+    const res = await fetch(`/api/cadastro-pj-plus?CNPJ=${digits}`);
+    if (res.status === 404) throw new CompanyNotFoundError(digits);
+    if (!res.ok) {
+      const detail = await extractErrorDetail(res);
+      throw new Error(messageForStatus(res.status, detail));
+    }
+    let data: FonteDataCadastroPjPlus;
+    try {
+      data = (await res.json()) as FonteDataCadastroPjPlus;
+    } catch {
+      throw new Error('Resposta inesperada da consulta FonteData (endpoint /api/cadastro-pj-plus indisponível).');
+    }
+    if (!data.cnpj) throw new CompanyNotFoundError(digits);
 
     const enderecoPrincipal = data.enderecos?.[0];
 

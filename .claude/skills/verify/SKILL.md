@@ -5,7 +5,8 @@ description: Build, launch and drive the Painel Societário graph app end-to-end
 
 # Verificando o Painel Societário
 
-App Vite + React (SPA, sem backend). Superfície: navegador.
+App Vite + React (SPA) com uma Vercel Edge Function (`api/cadastro-pj-plus.ts`)
+como proxy same-origin para a FonteData. Superfície: navegador.
 
 ## Build e launch
 
@@ -15,7 +16,18 @@ npm run preview -- --port 4173 --host 127.0.0.1 &   # serve dist/
 curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/   # espera 200
 ```
 
-`npm run dev` também funciona (porta 5173) para iterar sem rebuild.
+`npm run dev` também funciona (porta 5173) para iterar sem rebuild — mas nem
+`npm run dev` nem `npm run preview` servem `/api/*` (Vite não conhece Vercel
+Functions); servem só para trabalhar na UI, não são um teste válido da
+integração completa. Para exercitar a busca real (que chama
+`/api/cadastro-pj-plus`) é preciso `vercel dev` (Vercel CLI) com
+`FONTEDATA_API_KEY` no `.env`, ou testar direto numa URL de deploy/preview
+da Vercel. Sem isso, só dá para verificar a tela inicial estática e a
+validação client-side de CNPJ.
+
+`npm run test` roda a suíte Vitest (normalização de CNPJ, construção da URL
+da FonteData, separação CPF/CNPJ, cache por documento) — não depende de rede
+nem de chave.
 
 ## Drive (Playwright)
 
@@ -24,10 +36,12 @@ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/   # espera 200
 Scripts .mjs fora do repo precisam de um symlink para `node_modules` (ESM ignora NODE_PATH).
 
 O único provedor de dados é a FonteData (API comercial, real, sem modo
-demonstração): a expansão end-to-end depende de rede externa e de
-`VITE_FONTEDATA_API_KEY` configurada em `.env` antes do build/dev — sem a
-chave, toda consulta falha com "Chave de API da FonteData ausente ou
-inválida". Não há mais CNPJ fictício determinístico para smoke test.
+demonstração): a expansão end-to-end depende de rede externa, de `vercel dev`
+(ou deploy real) servindo `/api/cadastro-pj-plus`, e de `FONTEDATA_API_KEY`
+configurada — sem isso, toda consulta falha ("Failed to fetch" se `/api/*`
+não existe no servidor atual, ou "Chave de API da FonteData ausente ou
+inválida" se a function responde mas a chave não está configurada). Não há
+mais CNPJ fictício determinístico para smoke test.
 
 Fluxo principal a dirigir (requer chave válida e um CNPJ real conhecido).
 Os nós do grafo são DOM (React Flow), seletor `.rf-entity`:
@@ -47,7 +61,7 @@ Os nós do grafo são DOM (React Flow), seletor `.rf-entity`:
 
 ## Pegadinhas
 
-- Sem `VITE_FONTEDATA_API_KEY` válida não dá para verificar nada além do build/launch
+- Sem `FONTEDATA_API_KEY` válida não dá para verificar nada além do build/launch
   estático (tela inicial); qualquer submit de CNPJ vai falhar.
 - A FonteData não expande pessoas (busca reversa CPF → empresas não suportada, por
   design) — duplo clique num nó de pessoa mostra o aviso `notice`, não expande.

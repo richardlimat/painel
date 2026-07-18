@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.51.0",
@@ -22,6 +23,7 @@
   },
   "devDependencies": {
     "@types/d3-force": "^3.0.10",
+    "@types/node": "^26.1.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
@@ -30,6 +32,7 @@
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.6",
     "typescript": "~5.5.3",
-    "vite": "^5.3.4"
+    "vite": "^5.3.4",
+    "vitest": "^4.1.10"
   }
 }
