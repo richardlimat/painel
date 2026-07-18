@@ -63,22 +63,21 @@ A camada de dados é plugável (`src/services/provider.ts`):
 
 | Provedor | CNPJ → sócios | CPF → empresas |
 |---|---|---|
-| **Demonstração** (padrão) | ✅ rede sintética determinística | ✅ |
-| **BrasilAPI** (Receita Federal, dados abertos) | ✅ | ❌ (nenhuma API pública gratuita oferece busca reversa por CPF) |
+| **FonteData** (`cadastro-pj-plus`) | ✅ | ❌ (endpoint não oferece busca reversa por CPF) |
 
-Para expansão completa em produção, implemente `DataProvider` sobre um provedor
-comercial (CNPJá, BigDataCorp, Serasa, base interna etc.).
+A chamada é feita direto do navegador com a chave em `VITE_FONTEDATA_API_KEY`
+(sem backend/proxy — a chave fica exposta no bundle do cliente, aceitável
+apenas para uso interno/restrito).
 
 ## Rodando
 
 ```bash
+cp .env.example .env   # preencha VITE_FONTEDATA_API_KEY com sua chave da FonteData
 npm install
 npm run dev        # http://localhost:5173
 npm run build      # produção em dist/
 npm run preview
 ```
-
-No modo demonstração, qualquer CNPJ de 14 dígitos funciona (ex.: `12.345.678/0001-90`).
 
 ## Arquitetura
 
@@ -87,8 +86,7 @@ src/
 ├── types/graph.ts          # modelo de grafo: nós Pessoa/Empresa, relacionamentos tipados
 ├── services/
 │   ├── provider.ts         # interface DataProvider (plugável)
-│   ├── brasilapi.ts        # provedor real (dados abertos da Receita)
-│   └── demoProvider.ts     # rede sintética determinística p/ demonstração
+│   └── fontedata.ts        # provedor real (API comercial FonteData)
 ├── store/graphStore.ts     # Zustand: expansão BFS, dedupe/anti-loop, filtros, tema
 ├── lib/
 │   ├── filtering.ts        # filtros dinâmicos + estatísticas + grau dos nós

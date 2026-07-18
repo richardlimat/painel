@@ -19,10 +19,9 @@ import {
   type ForceSettings,
 } from '../lib/forceSim';
 import { ReverseLookupUnsupportedError } from '../services/provider';
-import { BrasilApiProvider } from '../services/brasilapi';
-import { DemoProvider } from '../services/demoProvider';
+import { FonteDataProvider } from '../services/fontedata';
 
-export type ProviderMode = 'demo' | 'brasilapi';
+export type ProviderMode = 'fontedata';
 
 export const companyId = (cnpj: string) => `c:${onlyDigits(cnpj).padStart(14, '0')}`;
 export const personId = (cpfOrName: string) => `p:${cpfOrName.trim()}`;
@@ -238,8 +237,8 @@ function mergePersonResult(state: GraphState, result: PersonLookupResult, depth:
 const initialForce = loadForceSettings();
 
 export const useGraphStore = create<GraphState>((set, get) => ({
-  providerMode: 'demo',
-  providers: { demo: new DemoProvider(), brasilapi: new BrasilApiProvider() },
+  providerMode: 'fontedata',
+  providers: { fontedata: new FonteDataProvider() },
   nodes: [],
   links: [],
   nodeIndex: new Map(),

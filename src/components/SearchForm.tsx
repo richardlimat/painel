@@ -3,19 +3,11 @@ import { motion } from 'framer-motion';
 import { useGraphStore } from '../store/graphStore';
 import { isValidCNPJ, maskCNPJ, onlyDigits } from '../lib/format';
 
-const EXAMPLES = [
-  { label: 'Exemplo A', cnpj: '12345678000190' },
-  { label: 'Exemplo B', cnpj: '98765432000155' },
-  { label: 'Exemplo C', cnpj: '11222333000144' },
-];
-
-/** Tela inicial: informa o CNPJ raiz, o provedor e o limite de camadas */
+/** Tela inicial: informa o CNPJ raiz e o limite de camadas */
 export function SearchForm() {
   const startSearch = useGraphStore((s) => s.startSearch);
   const loading = useGraphStore((s) => s.loading);
   const error = useGraphStore((s) => s.error);
-  const providerMode = useGraphStore((s) => s.providerMode);
-  const setProviderMode = useGraphStore((s) => s.setProviderMode);
   const maxDepth = useGraphStore((s) => s.maxDepth);
   const setMaxDepth = useGraphStore((s) => s.setMaxDepth);
   const [cnpj, setCnpj] = useState('');
@@ -28,7 +20,7 @@ export function SearchForm() {
       setValidationError('Informe um CNPJ com 14 dígitos.');
       return;
     }
-    if (providerMode === 'brasilapi' && !isValidCNPJ(digits)) {
+    if (!isValidCNPJ(digits)) {
       setValidationError('CNPJ inválido (dígitos verificadores não conferem).');
       return;
     }
@@ -68,44 +60,26 @@ export function SearchForm() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Fonte de dados
-              </label>
-              <select
-                value={providerMode}
-                onChange={(e) => setProviderMode(e.target.value as 'demo' | 'brasilapi')}
-                className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-              >
-                <option value="demo">Demonstração (rede sintética)</option>
-                <option value="brasilapi">BrasilAPI (Receita Federal)</option>
-              </select>
-            </div>
-            <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
-                Limite de níveis
-              </label>
-              <select
-                value={maxDepth === Infinity ? 'inf' : maxDepth}
-                onChange={(e) => setMaxDepth(e.target.value === 'inf' ? Infinity : Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
-              >
-                <option value={3}>3 níveis</option>
-                <option value={5}>5 níveis</option>
-                <option value={10}>10 níveis</option>
-                <option value="inf">Ilimitado</option>
-              </select>
-            </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+              Limite de níveis
+            </label>
+            <select
+              value={maxDepth === Infinity ? 'inf' : maxDepth}
+              onChange={(e) => setMaxDepth(e.target.value === 'inf' ? Infinity : Number(e.target.value))}
+              className="w-full rounded-lg border border-slate-300 bg-white px-2 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200"
+            >
+              <option value={3}>3 níveis</option>
+              <option value={5}>5 níveis</option>
+              <option value={10}>10 níveis</option>
+              <option value="inf">Ilimitado</option>
+            </select>
           </div>
 
-          {providerMode === 'brasilapi' && (
-            <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
-              A BrasilAPI (dados abertos) retorna o quadro societário de cada CNPJ, mas não suporta a busca reversa
-              CPF → empresas. Para expansão completa em múltiplas camadas, use o modo demonstração ou configure um
-              provedor comercial.
-            </p>
-          )}
+          <p className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+            A consulta FonteData retorna o quadro societário de cada CNPJ, mas não suporta a busca reversa CPF →
+            empresas.
+          </p>
 
           {(validationError || error) && (
             <p className="rounded-lg bg-red-50 p-2.5 text-sm text-red-600 dark:bg-red-900/30 dark:text-red-300">
@@ -121,21 +95,6 @@ export function SearchForm() {
             {loading ? 'Consultando…' : 'Mapear estrutura societária'}
           </button>
         </form>
-
-        {providerMode === 'demo' && (
-          <div className="mt-4 flex items-center justify-center gap-2 text-xs text-slate-400">
-            Testar com:
-            {EXAMPLES.map((ex) => (
-              <button
-                key={ex.cnpj}
-                onClick={() => setCnpj(maskCNPJ(ex.cnpj))}
-                className="rounded-full border border-slate-200 px-2.5 py-1 hover:border-gray-500 hover:text-gray-900 dark:border-slate-700"
-              >
-                {ex.label}
-              </button>
-            ))}
-          </div>
-        )}
       </motion.div>
     </div>
   );
