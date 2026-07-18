@@ -34,6 +34,10 @@ interface GraphState {
   timeline: TimelineEvent[];
   rootId: string | null;
   maxDepth: number; // Infinity = ilimitado
+  /** camada atual do controle [−] Camada N [+]: exibe nós com depth <= currentLayer */
+  currentLayer: number;
+  /** consulta de camada em andamento (bloqueia cliques repetidos no controle) */
+  layerLoading: boolean;
   selectedNodeId: string | null;
   breadcrumb: string[];
   expandingIds: Set<string>;
@@ -63,9 +67,11 @@ interface GraphState {
   notify: (msg: string) => void;
   clearNotice: () => void;
   startSearch: (cnpj: string) => Promise<void>;
-  expandNode: (id: string) => Promise<void>;
+  expandNode: (id: string, opts?: { force?: boolean }) => Promise<void>;
   expandAll: () => Promise<void>;
   collapseAll: () => void;
+  nextLayer: () => Promise<void>;
+  prevLayer: () => void;
   reset: () => void;
 }
 
@@ -222,6 +228,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   timeline: [],
   rootId: null,
   maxDepth: 5,
+  currentLayer: 1,
+  layerLoading: false,
   selectedNodeId: null,
   breadcrumb: [],
   expandingIds: new Set(),
@@ -283,17 +291,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       const result = await provider.getCompany(cnpj);
       const merged = mergeCompanyResult(get(), result, 0);
       const rootId = companyId(result.company.cnpj);
-      set({ ...merged, rootId, loading: false, breadcrumb: [rootId] });
+      set({ ...merged, rootId, loading: false, breadcrumb: [rootId], currentLayer: 1, layerLoading: false });
     } catch (e) {
       set({ loading: false, error: e instanceof Error ? e.message : 'Erro na consulta' });
     }
   },
 
-  expandNode: async (id: string) => {
+  expandNode: async (id: string, opts?: { force?: boolean }) => {
     const state = get();
     const node = state.nodeIndex.get(id);
     if (!node || node.expanded || state.expandingIds.has(id)) return;
-    if (node.depth >= state.maxDepth) {
+    if (!opts?.force && node.depth >= state.maxDepth) {
       set({ notice: `Limite de ${state.maxDepth} níveis atingido. Aumente o limite para continuar expandindo.` });
       return;
     }
@@ -311,6 +319,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         if (get().graphEpoch !== epoch) return;
         const merged = mergePersonResult(get(), result, node.depth);
         set(merged);
+      }
+      // expansão manual (duplo clique / painel): garante que os filhos fiquem visíveis
+      if (!opts?.force && node.depth + 1 > get().currentLayer) {
+        set({ currentLayer: node.depth + 1 });
       }
     } catch (e) {
       if (e instanceof ReverseLookupUnsupportedError) {
@@ -349,6 +361,49 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     set({ loading: false });
   },
 
+  nextLayer: async () => {
+    const s0 = get();
+    if (s0.layerLoading || !s0.rootId) return;
+    const target = s0.currentLayer + 1;
+    const all = [...s0.nodeIndex.values()];
+    const alreadyLoadedNext = all.some((n) => n.depth === target);
+    // fronteira: nós ainda não expandidos dentro das camadas visíveis
+    const frontier = all.filter((n) => !n.expanded && n.depth <= s0.currentLayer);
+    if (!alreadyLoadedNext && frontier.length === 0) {
+      set({ notice: 'Última camada alcançada — não há novas conexões nos dados.' });
+      return;
+    }
+    set({ layerLoading: true, notice: null });
+    const epoch = s0.graphEpoch;
+    try {
+      for (let i = 0; i < frontier.length; i += 6) {
+        if (get().graphEpoch !== epoch) return;
+        if (get().nodeIndex.size >= EXPAND_ALL_NODE_CAP) {
+          set({ notice: `Expansão limitada a ${EXPAND_ALL_NODE_CAP} nós (limite de segurança).` });
+          break;
+        }
+        await Promise.all(frontier.slice(i, i + 6).map((n) => get().expandNode(n.id, { force: true })));
+      }
+      if (get().graphEpoch !== epoch) return;
+      const hasNext = [...get().nodeIndex.values()].some((n) => n.depth === target);
+      if (hasNext) {
+        set({ currentLayer: target });
+        get().requestOrganize();
+      } else {
+        set({ notice: 'Última camada alcançada — não há novas conexões nos dados.' });
+      }
+    } finally {
+      set({ layerLoading: false });
+    }
+  },
+
+  prevLayer: () => {
+    const s = get();
+    if (s.currentLayer <= 1 || s.layerLoading) return;
+    set({ currentLayer: s.currentLayer - 1 });
+    get().requestOrganize();
+  },
+
   collapseAll: () => {
     const { rootId, nodeIndex, links } = get();
     if (!rootId) return;
@@ -380,6 +435,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       selectedNodeId: null,
       graphEpoch: s.graphEpoch + 1,
       loading: false,
+      currentLayer: 1,
+      layerLoading: false,
     }));
   },
 

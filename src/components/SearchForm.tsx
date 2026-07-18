@@ -63,7 +63,7 @@ export function SearchForm() {
               onChange={(e) => setCnpj(maskCNPJ(e.target.value))}
               placeholder="00.000.000/0000-00"
               inputMode="numeric"
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg tracking-wide text-slate-900 placeholder-slate-300 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg tracking-wide text-slate-900 placeholder-slate-300 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-gray-400/30 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
               autoFocus
             />
           </div>
@@ -116,7 +116,7 @@ export function SearchForm() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-xl bg-indigo-600 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/25 transition hover:bg-indigo-500 disabled:opacity-50"
+            className="w-full rounded-xl bg-gray-900 py-3 text-sm font-semibold text-white shadow-lg shadow-gray-900/20 transition hover:bg-gray-700 disabled:opacity-50"
           >
             {loading ? 'Consultando…' : 'Mapear estrutura societária'}
           </button>
@@ -129,7 +129,7 @@ export function SearchForm() {
               <button
                 key={ex.cnpj}
                 onClick={() => setCnpj(maskCNPJ(ex.cnpj))}
-                className="rounded-full border border-slate-200 px-2.5 py-1 hover:border-indigo-400 hover:text-indigo-600 dark:border-slate-700"
+                className="rounded-full border border-slate-200 px-2.5 py-1 hover:border-gray-500 hover:text-gray-900 dark:border-slate-700"
               >
                 {ex.label}
               </button>

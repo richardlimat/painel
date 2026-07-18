@@ -9,10 +9,10 @@ import type { GraphLink, GraphNode, TimelineEvent } from '../../types/graph';
 const nid = (v: string | GraphNode) => (typeof v === 'string' ? v : v.id);
 
 const TL_COLORS: Record<TimelineEvent['kind'], string> = {
-  abertura: '#1671f9',
-  entrada_socio: '#18a568',
-  saida_socio: '#f04e57',
-  alteracao: '#f5a12c',
+  abertura: '#111827',
+  entrada_socio: '#6b7280',
+  saida_socio: '#9ca3af',
+  alteracao: '#d1d5db',
 };
 
 function DataRow({ icon, label, value }: { icon: string; label: string; value?: string | number | null }) {
@@ -86,13 +86,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
               className="entity-icon"
               style={{
                 background:
-                  node.kind === 'person'
-                    ? node.person?.administrador
-                      ? 'var(--amber)'
-                      : 'var(--green)'
-                    : situacao === 'BAIXADA'
-                      ? 'var(--red)'
-                      : 'var(--blue)',
+                  node.kind === 'person' ? '#6b7280' : situacao === 'BAIXADA' ? '#9ca3af' : '#374151',
               }}
             >
               {node.kind === 'person' ? <PersonIcon /> : <CompanyIcon />}
@@ -170,7 +164,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                           </div>
                         </div>
                         <div className="stat">
-                          <i style={{ color: '#1671f9', background: '#edf5ff' }}>
+                          <i style={{ color: '#374151', background: '#f3f4f6' }}>
                             <CompanyIcon className="mini-building" />
                           </i>
                           <div>
@@ -194,7 +188,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                       />
                       <div className="stat-cards">
                         <div className="stat">
-                          <i style={{ color: '#1671f9', background: '#edf5ff' }}>
+                          <i style={{ color: '#374151', background: '#f3f4f6' }}>
                             <CompanyIcon className="mini-building" />
                           </i>
                           <div>
@@ -225,7 +219,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                         className="tiny-avatar"
                         style={
                           other.kind === 'company'
-                            ? { background: other.company?.situacao === 'BAIXADA' ? '#f04e57' : '#1671f9', color: '#fff' }
+                            ? { background: other.company?.situacao === 'BAIXADA' ? '#9ca3af' : '#374151', color: '#fff' }
                             : undefined
                         }
                       >
@@ -252,7 +246,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                       className="tiny-avatar"
                       style={
                         other.kind === 'company'
-                          ? { background: other.company?.situacao === 'BAIXADA' ? '#f04e57' : '#1671f9', color: '#fff' }
+                          ? { background: other.company?.situacao === 'BAIXADA' ? '#9ca3af' : '#374151', color: '#fff' }
                           : undefined
                       }
                     >
@@ -313,7 +307,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
             <button className="close" onClick={onClose} aria-label="Fechar painel">
               ×
             </button>
-            <div className="entity-icon" style={{ background: 'var(--purple)' }}>
+            <div className="entity-icon" style={{ background: '#374151' }}>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M5 20V11M11 20V5M17 20v-7M3 20h18" />
               </svg>
@@ -336,7 +330,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
               <div className="data">
                 <div className="stat-cards">
                   <div className="stat">
-                    <i style={{ color: '#1671f9', background: '#edf5ff' }}>
+                    <i style={{ color: '#374151', background: '#f3f4f6' }}>
                       <CompanyIcon className="mini-building" />
                     </i>
                     <div>
@@ -354,14 +348,14 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                     </div>
                   </div>
                   <div className="stat">
-                    <i style={{ color: '#8257e6', background: '#f2edff' }}>⌁</i>
+                    <i style={{ color: '#374151', background: '#f3f4f6' }}>⌁</i>
                     <div>
                       <b>{stats.totalLinks}</b>
                       <small>conexões</small>
                     </div>
                   </div>
                   <div className="stat">
-                    <i style={{ color: '#ff762a', background: '#fff3ec' }}>≣</i>
+                    <i style={{ color: '#374151', background: '#f3f4f6' }}>≣</i>
                     <div>
                       <b>{stats.maxDepth}</b>
                       <small>níveis mapeados</small>
@@ -375,7 +369,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                     </div>
                   </div>
                   <div className="stat">
-                    <i style={{ color: '#f04e57', background: '#fff1f2' }}>✕</i>
+                    <i style={{ color: '#374151', background: '#f3f4f6' }}>✕</i>
                     <div>
                       <b>{stats.baixadas}</b>
                       <small>empresas baixadas</small>
@@ -391,7 +385,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                     <h4 className="subheading">CNAEs na rede</h4>
                     {stats.cnaes.slice(0, 10).map((c) => (
                       <div className="owner-row" key={c}>
-                        <i style={{ background: '#1671f9' }} />
+                        <i style={{ background: '#6b7280' }} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c}</span>
                       </div>
                     ))}

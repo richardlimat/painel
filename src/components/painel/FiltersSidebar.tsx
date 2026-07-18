@@ -68,37 +68,37 @@ export function FiltersSidebar({ open }: { open: boolean }) {
       />
       <FilterRow
         label="Somente ativas"
-        icon={<span style={{ color: 'var(--blue)' }}>●</span>}
+        icon={<span style={{ color: '#6b7280' }}>●</span>}
         checked={filters.onlyActive}
         onChange={(v) => setFilters({ onlyActive: v, onlyBaixadas: false })}
       />
       <FilterRow
         label="Somente baixadas"
-        icon={<span style={{ color: 'var(--red)' }}>●</span>}
+        icon={<span style={{ color: '#6b7280' }}>●</span>}
         checked={filters.onlyBaixadas}
         onChange={(v) => setFilters({ onlyBaixadas: v, onlyActive: false })}
       />
       <FilterRow
         label="Administradores"
-        icon={<span style={{ color: 'var(--amber)' }}>●</span>}
+        icon={<span style={{ color: '#6b7280' }}>●</span>}
         checked={filters.onlyAdmins}
         onChange={(v) => setFilters({ onlyAdmins: v })}
       />
       <FilterRow
         label="Sócios / participações"
-        icon={<span style={{ color: 'var(--purple)' }}>●</span>}
+        icon={<span style={{ color: '#6b7280' }}>●</span>}
         checked={filters.onlyPartners}
         onChange={(v) => setFilters({ onlyPartners: v })}
       />
       <FilterRow
         label="Filiais"
-        icon={<span style={{ color: 'var(--orange)' }}>●</span>}
+        icon={<span style={{ color: '#6b7280' }}>●</span>}
         checked={filters.showBranches}
         onChange={(v) => setFilters({ showBranches: v })}
       />
       <FilterRow
         label="Matrizes"
-        icon={<span style={{ color: 'var(--purple)' }}>⌘</span>}
+        icon={<span style={{ color: '#6b7280' }}>⌘</span>}
         checked={filters.showHeadquarters}
         onChange={(v) => setFilters({ showHeadquarters: v })}
       />
@@ -171,7 +171,12 @@ export function FiltersSidebar({ open }: { open: boolean }) {
       <div className="legend">
         {NODE_LEGEND.map((item) => (
           <div key={item.label}>
-            <i style={{ background: item.color }} />
+            <i
+              style={{
+                background: item.visual.bg,
+                border: `1.5px ${item.dashed ? 'dashed' : 'solid'} ${item.visual.border}`,
+              }}
+            />
             {item.label}
           </div>
         ))}

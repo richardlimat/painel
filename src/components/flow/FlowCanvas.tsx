@@ -13,7 +13,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import { useGraphStore } from '../../store/graphStore';
 import { applyFilters, degreeMap } from '../../lib/filtering';
-import { LINK_COLORS, NODE_COLORS, RELATION_LABELS, nodeColor, nodeKindClass } from '../../lib/colors';
+import { LINK_COLORS, RELATION_LABELS, ROOT_VISUAL, nodeKindClass, nodeVisual } from '../../lib/colors';
 import { formatCNPJ } from '../../lib/format';
 import { placeAround, radialLayout, type XY } from '../../lib/flowLayout';
 import type { GraphNode } from '../../types/graph';
@@ -30,7 +30,7 @@ function FlowCanvasInner() {
   const links = useGraphStore((s) => s.links);
   const filters = useGraphStore((s) => s.filters);
   const rootId = useGraphStore((s) => s.rootId);
-  const maxDepth = useGraphStore((s) => s.maxDepth);
+  const currentLayer = useGraphStore((s) => s.currentLayer);
   const theme = useGraphStore((s) => s.theme);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const expandingIds = useGraphStore((s) => s.expandingIds);
@@ -45,10 +45,11 @@ function FlowCanvasInner() {
   const prevRootRef = useRef<string | null>(null);
   const [rfNodes, setRfNodes] = useState<EntityFlowNode[]>([]);
 
+  // camadas cumulativas: exibe apenas nós até a camada atual do controle
   const visible = useMemo(() => {
-    const depthFiltered = nodes.filter((n) => n.depth <= maxDepth);
+    const depthFiltered = nodes.filter((n) => n.depth <= currentLayer);
     return applyFilters(depthFiltered, links, filters, rootId);
-  }, [nodes, links, filters, rootId, maxDepth]);
+  }, [nodes, links, filters, rootId, currentLayer]);
 
   const degrees = useMemo(() => degreeMap(visible.links), [visible.links]);
 
@@ -60,7 +61,7 @@ function FlowCanvasInner() {
       const capitalBoost = capital > 0 ? Math.min(6, Math.log10(capital) / 2) : 0;
       const base = n.kind === 'company' ? 34 : 30;
       const radius = isRoot ? 50 : Math.min(46, Math.round(base + Math.min(10, deg * 1.1) + capitalBoost));
-      const matrizAtiva = n.company?.matriz === true && n.company?.situacao === 'ATIVA';
+      const visual = isRoot ? ROOT_VISUAL : nodeVisual(n);
       return {
         id: n.id,
         type: 'entity',
@@ -69,8 +70,9 @@ function FlowCanvasInner() {
         data: {
           kind: nodeKindClass(n),
           isPerson: n.kind === 'person',
-          color: nodeColor(n),
-          ring: isRoot ? '#0d63e8' : matrizAtiva && !isRoot ? NODE_COLORS.matriz : undefined,
+          bg: visual.bg,
+          fg: visual.fg,
+          border: visual.border,
           radius,
           label: n.label,
           subLabel: n.company?.nomeFantasia,
@@ -193,7 +195,15 @@ function FlowCanvasInner() {
     }
   }, []);
 
+  // um clique seleciona (painel de detalhes); dois cliques expandem as conexões
   const onNodeClick = useCallback(
+    (_: React.MouseEvent, node: EntityFlowNode) => {
+      selectNode(node.id);
+    },
+    [selectNode],
+  );
+
+  const onNodeDoubleClick = useCallback(
     (_: React.MouseEvent, node: EntityFlowNode) => {
       selectNode(node.id);
       if (!node.data.expanded) void expandNode(node.id);
@@ -210,7 +220,9 @@ function FlowCanvasInner() {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={onNodeDoubleClick}
         onPaneClick={() => selectNode(null)}
+        zoomOnDoubleClick={false}
         fitView
         fitViewOptions={{ padding: 0.16 }}
         minZoom={0.15}
@@ -220,7 +232,7 @@ function FlowCanvasInner() {
         proOptions={{ hideAttribution: true }}
         colorMode={theme}
       >
-        <Background variant={BackgroundVariant.Dots} gap={18} size={1} color={theme === 'dark' ? '#2b3a55' : '#d5dde8'} />
+        <Background variant={BackgroundVariant.Dots} gap={18} size={1} color="#e5e7eb" />
         <Controls showInteractive={false} position="bottom-left" />
       </ReactFlow>
     </div>

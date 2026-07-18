@@ -27,7 +27,8 @@ Fluxo principal a dirigir (modo Demonstração — determinístico, sem rede).
 Os nós do grafo são DOM (React Flow), seletor `.rf-entity`:
 
 1. Preencher `#cnpj` com `12.345.678/0001-90`, submeter → `page.waitForSelector('.rf-entity')`.
-2. Clicar em `.rf-entity.person` → expande as empresas da pessoa e abre `.details.open`.
+2. Clique simples em `.rf-entity` → seleciona e abre `.details.open`; DUPLO clique → expande.
+   Controle de camadas: `.layer-control` (− / "Camada N" / +) sobreposto ao topo do mapa.
 3. `button:has-text("Expandir Tudo")` → rede cresce em ondas (esperar ~8s até estabilizar).
 4. Painéis: `button:has-text("Estatísticas")` (painel direito, abas Indicadores/Linha do tempo),
    filtros na sidebar esquerda (`.filter-row`, `.range`).

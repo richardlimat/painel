@@ -17,13 +17,22 @@ direito de detalhes com abas (Visão geral / Sócios / Histórico) e modo
 Estatísticas (Indicadores / Linha do tempo). Percentuais de participação
 societária não são exibidos nem exportados.
 
+A identidade visual é totalmente branca e neutra (preto/grafite/cinza — sem azul):
+empresas são círculos grafite preenchidos, pessoas são círculos brancos com borda,
+baixadas têm contorno tracejado e filiais usam cinza médio.
+
 ## Funcionalidades
 
 - **Mapa interativo em React Flow** (@xyflow/react): pan, zoom, arrastar nós (posição
   preservada), controles, layout radial automático e botão **Reorganizar**.
-- **Expansão inteligente**: carrega inicialmente só a empresa pesquisada + sócios; cada
-  clique expande a próxima camada. Botões **Expandir Tudo** (BFS até o limite de níveis,
-  com teto de segurança de 600 nós) e **Recolher Tudo**.
+- **Controle de camadas** `[ − ] Camada N [ + ]` flutuante sobre o mapa: camadas
+  cumulativas (avançar adiciona o próximo nível de relacionamentos mantendo os
+  anteriores; voltar oculta apenas os exclusivos das camadas superiores, com cache
+  dos dados já consultados). O `−` desabilita na Camada 1 e o `+` quando não há
+  novas conexões nos dados.
+- **Expansão individual**: clique simples seleciona (painel de detalhes); **duplo
+  clique** expande as conexões do nó. Botões **Expandir Tudo** (BFS até o limite de
+  níveis, com teto de segurança de 600 nós) e **Recolher Tudo**.
 - **Limite de camadas configurável**: 2, 3, 5, 10 ou ilimitado; entidades já visitadas
   são deduplicadas (anti-loop).
 - **Identidade visual**: empresas ativas em azul, pessoas em verde, administradores em
