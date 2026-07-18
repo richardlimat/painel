@@ -96,7 +96,9 @@ function formatEndereco(e?: FonteDataEndereco): string | undefined {
 async function extractErrorDetail(res: Response): Promise<string | undefined> {
   try {
     const body = await res.clone().json();
-    return body?.message ?? body?.mensagem ?? body?.erro ?? body?.error ?? JSON.stringify(body);
+    const msg = body?.message ?? body?.mensagem ?? body?.erro ?? body?.error ?? body;
+    if (msg == null) return undefined;
+    return typeof msg === 'string' ? msg : JSON.stringify(msg);
   } catch {
     try {
       const text = await res.clone().text();
