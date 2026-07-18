@@ -102,17 +102,20 @@ export class FonteDataProvider implements DataProvider {
 
   async getCompany(cnpj: string): Promise<CompanyLookupResult> {
     const digits = onlyDigits(cnpj);
-    const apiKey = import.meta.env.VITE_FONTEDATA_API_KEY as string | undefined;
-    const res = await fetch(
-      `https://app.fontedata.com/api/v1/consulta/cadastro-pj-plus?CNPJ=${digits}`,
-      { headers: { 'X-API-Key': apiKey ?? '' } },
-    );
+    // Chamada same-origin: o proxy em api/cadastro-pj-plus.ts repassa para a
+    // FonteData no servidor, evitando CORS e mantendo a chave fora do bundle.
+    const res = await fetch(`/api/cadastro-pj-plus?CNPJ=${digits}`);
     if (res.status === 404) throw new CompanyNotFoundError(cnpj);
-    if (res.status === 401 || res.status === 403) {
-      throw new Error('Chave de API da FonteData ausente ou inválida (VITE_FONTEDATA_API_KEY).');
+    if (res.status === 401 || res.status === 403 || res.status === 500) {
+      throw new Error('Chave de API da FonteData ausente ou inválida (configuração do servidor).');
     }
     if (!res.ok) throw new Error(`Falha na consulta FonteData (HTTP ${res.status})`);
-    const data = (await res.json()) as FonteDataCadastroPjPlus;
+    let data: FonteDataCadastroPjPlus;
+    try {
+      data = (await res.json()) as FonteDataCadastroPjPlus;
+    } catch {
+      throw new Error('Resposta inesperada da consulta FonteData (endpoint /api/cadastro-pj-plus indisponível).');
+    }
     if (!data.cnpj) throw new CompanyNotFoundError(cnpj);
 
     const enderecoPrincipal = data.enderecos?.[0];
