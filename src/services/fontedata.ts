@@ -92,6 +92,21 @@ function formatEndereco(e?: FonteDataEndereco): string | undefined {
   return [e.logradouro, e.numero, e.bairro].filter(Boolean).join(', ') || undefined;
 }
 
+/** Extrai a mensagem de erro do corpo da resposta (JSON ou texto), quando houver */
+async function extractErrorDetail(res: Response): Promise<string | undefined> {
+  try {
+    const body = await res.clone().json();
+    return body?.message ?? body?.mensagem ?? body?.erro ?? body?.error ?? JSON.stringify(body);
+  } catch {
+    try {
+      const text = await res.clone().text();
+      return text || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+}
+
 /**
  * Provedor baseado na FonteData (https://fontedata.com), API comercial de
  * dados cadastrais de pessoas jurídicas. Suporta consulta de CNPJ + QSA;
@@ -106,10 +121,15 @@ export class FonteDataProvider implements DataProvider {
     // FonteData no servidor, evitando CORS e mantendo a chave fora do bundle.
     const res = await fetch(`/api/cadastro-pj-plus?CNPJ=${digits}`);
     if (res.status === 404) throw new CompanyNotFoundError(cnpj);
-    if (res.status === 401 || res.status === 403 || res.status === 500) {
-      throw new Error('Chave de API da FonteData ausente ou inválida (configuração do servidor).');
+    if (!res.ok) {
+      const detail = await extractErrorDetail(res);
+      if (res.status === 401 || res.status === 403 || res.status === 500) {
+        throw new Error(
+          `Chave de API da FonteData ausente ou inválida (configuração do servidor).${detail ? ` Detalhe: ${detail}` : ''}`,
+        );
+      }
+      throw new Error(`Falha na consulta FonteData (HTTP ${res.status})${detail ? `: ${detail}` : ''}`);
     }
-    if (!res.ok) throw new Error(`Falha na consulta FonteData (HTTP ${res.status})`);
     let data: FonteDataCadastroPjPlus;
     try {
       data = (await res.json()) as FonteDataCadastroPjPlus;
