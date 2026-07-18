@@ -1,21 +1,60 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { GraphNode } from '../../types/graph';
 import { usePersonProfileStore } from '../../store/personProfileStore';
 import { applyMask, classifyKey, type MaskClass } from '../../lib/mask';
 import {
   MAX_RENDER_DEPTH,
   decodeBase64ToBlob,
-  describePrimitive,
   formatApproxSize,
+  formatScalarValue,
   isLikelyDocumentBlob,
   truncateItems,
 } from '../../lib/profileRender';
+import { groupServiceResponse, type ProfileCategoryGroup } from '../../lib/profileCategories';
+import { normalizeText } from '../../lib/format';
 import { CollapsibleSection } from './CollapsibleSection';
 
 function countRecords(value: unknown): number | undefined {
   if (Array.isArray(value)) return value.length;
   if (value !== null && typeof value === 'object') return Object.keys(value).length;
   return undefined;
+}
+
+function categoryRecordCount(entries: [string, unknown][]): number {
+  return entries.reduce((sum, [, v]) => sum + (countRecords(v) ?? 1), 0);
+}
+
+/** Realce discreto do trecho encontrado — só o primeiro match, sem HTML perigoso (texto React puro). */
+function highlightMatch(text: string, query: string): ReactNode {
+  if (!query) return text;
+  const idx = text.toLowerCase().indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark>{text.slice(idx, idx + query.length)}</mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
+/** Busca recursiva por nome de campo/valor textual — mesmo limite de profundidade da renderização. */
+function valueMatchesQuery(value: unknown, query: string, depth = 0): boolean {
+  if (depth > MAX_RENDER_DEPTH) return false;
+  if (value == null) return false;
+  if (typeof value === 'string') return normalizeText(value).includes(query);
+  if (typeof value === 'number' || typeof value === 'boolean') return normalizeText(String(value)).includes(query);
+  if (Array.isArray(value)) return value.some((v) => valueMatchesQuery(v, query, depth + 1));
+  if (typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).some(
+      ([k, v]) => normalizeText(k).includes(query) || valueMatchesQuery(v, query, depth + 1),
+    );
+  }
+  return false;
+}
+
+function entryMatchesQuery(key: string, value: unknown, query: string): boolean {
+  return normalizeText(key).includes(query) || valueMatchesQuery(value, query);
 }
 
 /**
@@ -74,11 +113,23 @@ function MaskedValue({ value, cls }: { value: string; cls: MaskClass }) {
   );
 }
 
-function RenderValue({ label, keyName, value, depth }: { label: string; keyName: string; value: unknown; depth: number }) {
+function RenderValue({
+  label,
+  keyName,
+  value,
+  depth,
+  query,
+}: {
+  label: string;
+  keyName: string;
+  value: unknown;
+  depth: number;
+  query: string;
+}) {
   if (depth > MAX_RENDER_DEPTH) {
     return (
       <div className="profile-row">
-        <span>{label}</span>
+        <span>{highlightMatch(label, query)}</span>
         <span className="profile-row-value">…</span>
       </div>
     );
@@ -87,7 +138,7 @@ function RenderValue({ label, keyName, value, depth }: { label: string; keyName:
   if (typeof value === 'string' && isLikelyDocumentBlob(keyName, value)) {
     return (
       <div className="profile-row">
-        <span>{label}</span>
+        <span>{highlightMatch(label, query)}</span>
         <DocumentValue base64={value} />
       </div>
     );
@@ -97,7 +148,7 @@ function RenderValue({ label, keyName, value, depth }: { label: string; keyName:
   if (cls !== 'none' && typeof value === 'string' && value !== '') {
     return (
       <div className="profile-row">
-        <span>{label}</span>
+        <span>{highlightMatch(label, query)}</span>
         <MaskedValue value={value} cls={cls} />
       </div>
     );
@@ -107,7 +158,7 @@ function RenderValue({ label, keyName, value, depth }: { label: string; keyName:
     if (value.length === 0) {
       return (
         <div className="profile-row">
-          <span>{label}</span>
+          <span>{highlightMatch(label, query)}</span>
           <span className="profile-row-value">Nenhum registro encontrado</span>
         </div>
       );
@@ -117,7 +168,7 @@ function RenderValue({ label, keyName, value, depth }: { label: string; keyName:
       <div className="profile-array">
         {visible.map((item, i) => (
           <div className="profile-array-item" key={i}>
-            <RenderValue label={`#${i + 1}`} keyName={keyName} value={item} depth={depth + 1} />
+            <RenderValue label={`#${i + 1}`} keyName={keyName} value={item} depth={depth + 1} query={query} />
           </div>
         ))}
         {hiddenCount > 0 && <p className="profile-more">+{hiddenCount} mais</p>}
@@ -130,7 +181,7 @@ function RenderValue({ label, keyName, value, depth }: { label: string; keyName:
     if (entries.length === 0) {
       return (
         <div className="profile-row">
-          <span>{label}</span>
+          <span>{highlightMatch(label, query)}</span>
           <span className="profile-row-value">Nenhum registro encontrado</span>
         </div>
       );
@@ -138,7 +189,7 @@ function RenderValue({ label, keyName, value, depth }: { label: string; keyName:
     return (
       <div className="profile-object">
         {entries.map(([k, v]) => (
-          <RenderValue key={k} label={k} keyName={k} value={v} depth={depth + 1} />
+          <RenderValue key={k} label={k} keyName={k} value={v} depth={depth + 1} query={query} />
         ))}
       </div>
     );
@@ -146,17 +197,39 @@ function RenderValue({ label, keyName, value, depth }: { label: string; keyName:
 
   return (
     <div className="profile-row">
-      <span>{label}</span>
-      <span className="profile-row-value">{describePrimitive(value)}</span>
+      <span>{highlightMatch(label, query)}</span>
+      <span className="profile-row-value">{highlightMatch(formatScalarValue(keyName, value), query)}</span>
     </div>
   );
 }
 
+function CategorySection({ group, query }: { group: ProfileCategoryGroup; query: string }) {
+  return (
+    <CollapsibleSection
+      title={highlightMatch(group.name, query)}
+      count={categoryRecordCount(group.entries)}
+      forceOpen={!!query}
+    >
+      {group.entries.length === 0 ? (
+        <p className="profile-row-value">Nenhum registro encontrado</p>
+      ) : (
+        group.entries.map(([key, value]) => (
+          <CollapsibleSection key={key} title={highlightMatch(key, query)} count={countRecords(value)} forceOpen={!!query}>
+            <RenderValue label={key} keyName={key} value={value} depth={0} query={query} />
+          </CollapsibleSection>
+        ))
+      )}
+    </CollapsibleSection>
+  );
+}
+
 /**
- * Perfil completo da APIFull (Etapa 1): seções recolhíveis simples por
- * chave de SERVICE_RESPONSE, sem categorização/busca (Etapa 2). Carrega o
- * perfil ao selecionar a pessoa — não expande o grafo (isso só acontece ao
- * avançar de camada). `sociedades[]` aparece aqui só como leitura.
+ * Perfil completo da APIFull, organizado em categorias (Etapa 2): busca no
+ * topo filtra por nome de seção/campo/valores e força abertura das
+ * categorias/chaves com resultado; sem busca, todas as 14 categorias +
+ * "Outros dados" aparecem recolhidas por padrão. Carrega o perfil ao
+ * selecionar a pessoa — nunca expande o grafo (isso só acontece ao avançar
+ * de camada, via o botão "+"/"Expandir conexões").
  */
 export function PersonProfilePanel({ node }: { node: GraphNode }) {
   const cpf = node.person?.cpf ?? '';
@@ -165,13 +238,29 @@ export function PersonProfilePanel({ node }: { node: GraphNode }) {
   const loading = usePersonProfileStore((s) => s.requestsByCpf.has(cpf));
   const error = usePersonProfileStore((s) => s.errorsByCpf.get(cpf));
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   useEffect(() => {
     if (cpf) void loadProfile(cpf);
+    setSearchQuery('');
   }, [cpf, loadProfile]);
 
-  if (!cpf) return null;
+  const query = normalizeText(searchQuery.trim());
 
-  const entries = profile ? Object.entries(profile.SERVICE_RESPONSE) : [];
+  const categoryGroups = useMemo(() => {
+    if (!profile) return [];
+    const groups = groupServiceResponse(profile.SERVICE_RESPONSE);
+    if (!query) return groups;
+    return groups
+      .map((g) => {
+        const nameMatches = normalizeText(g.name).includes(query);
+        const entries = nameMatches ? g.entries : g.entries.filter(([k, v]) => entryMatchesQuery(k, v, query));
+        return { ...g, entries };
+      })
+      .filter((g) => g.entries.length > 0);
+  }, [profile, query]);
+
+  if (!cpf) return null;
 
   return (
     <div className="profile-panel">
@@ -189,11 +278,18 @@ export function PersonProfilePanel({ node }: { node: GraphNode }) {
       )}
       {!loading && !error && profile && (
         <div className="profile-sections">
-          {entries.length === 0 && <p className="profile-status">Nenhum dado retornado.</p>}
-          {entries.map(([key, value]) => (
-            <CollapsibleSection key={key} title={key} count={countRecords(value)}>
-              <RenderValue label={key} keyName={key} value={value} depth={0} />
-            </CollapsibleSection>
+          <label className="profile-search">
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar nas informações da pessoa"
+              aria-label="Buscar nas informações da pessoa"
+            />
+          </label>
+          {query && categoryGroups.length === 0 && <p className="profile-status">Nenhum registro encontrado.</p>}
+          {categoryGroups.map((group) => (
+            <CategorySection key={group.name} group={group} query={searchQuery.trim()} />
           ))}
         </div>
       )}

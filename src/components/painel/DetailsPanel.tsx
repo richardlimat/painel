@@ -5,6 +5,7 @@ import { formatCNPJ, formatCurrency, formatDate } from '../../lib/format';
 import { RELATION_LABELS } from '../../lib/colors';
 import { CompanyIcon, PersonIcon } from '../flow/icons';
 import { PersonProfilePanel } from './PersonProfilePanel';
+import { QueueProgress } from './QueueProgress';
 import type { GraphLink, GraphNode, TimelineEvent } from '../../types/graph';
 
 const nid = (v: string | GraphNode) => (typeof v === 'string' ? v : v.id);
@@ -77,6 +78,7 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
 
   return (
     <aside className={`details ${open ? 'open' : ''}`} id="details">
+      <QueueProgress />
       {showEntity ? (
         <>
           <div className="entity-head">

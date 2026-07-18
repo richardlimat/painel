@@ -4,12 +4,13 @@ import type {
   GraphFilters,
   GraphLink,
   GraphNode,
+  RelationshipEvidence,
   RelationshipMeta,
   RelationType,
   TimelineEvent,
 } from '../types/graph';
 import { defaultFilters } from '../types/graph';
-import { onlyDigits } from '../lib/format';
+import { isValidCPF, onlyDigits } from '../lib/format';
 import type { DataProvider } from '../services/provider';
 import {
   FORCE_DEFAULTS,
@@ -122,32 +123,89 @@ function sortStrings(list: string[]): string[] {
 }
 
 /**
- * Preenche campos "principais" vazios/ausentes de `a` com os de `b`, sem
- * sobrescrever um valor válido (compatibilidade com quem lê os campos
- * singulares), e acumula TODAS as qualificações conhecidas nos campos em
- * lista — sem perder nenhuma quando a APIFull e a FonteData relatam
- * qualificações diferentes para o mesmo par empresa/pessoa (ex.: sócio por
- * uma fonte, administrador por outra). Dedup + ordenação estável garantem
- * que o resultado final não dependa da ordem de chegada das respostas.
+ * Prioridade fixa (não a ordem de chegada) pra escolher a evidência
+ * "primária" — usada só pra derivar os campos singulares de compatibilidade
+ * (funcao/origem/dataEntrada). Papéis administrativos/de representação
+ * antes de sócio simples; desempate alfabético (origem, depois
+ * qualificação, depois data) garante resultado 100% determinístico.
  */
-function mergeMeta(a: RelationshipMeta, typeA: RelationType, b: RelationshipMeta, typeB: RelationType): RelationshipMeta {
-  const pick = <K extends 'percentual' | 'dataEntrada' | 'situacao' | 'origem' | 'funcao'>(
-    key: K,
-  ): RelationshipMeta[K] => {
-    const av = a[key];
-    return av === undefined || av === null || av === '' ? b[key] : av;
-  };
+const PRIMARY_RELATION_PRIORITY: RelationType[] = [
+  'ADMINISTRADOR',
+  'REPRESENTANTE_LEGAL',
+  'CONTROLADORA',
+  'SOCIO',
+  'PARTICIPACAO',
+  'CONTROLADA',
+  'MATRIZ',
+  'FILIAL',
+];
+
+/**
+ * Internamente cada evidência também carrega `percentual`/`situacao` — não
+ * fazem parte do shape público de `RelationshipEvidence` (dedup usa só os
+ * 4 campos pedidos), mas viajam junto pra que os campos singulares de
+ * `RelationshipMeta` também sejam derivados da evidência primária com a
+ * mesma prioridade fixa (não "quem chegou primeiro"), garantindo que TODO
+ * o resultado independe da ordem de resposta das APIs.
+ */
+type EvidenceWithExtras = RelationshipEvidence & { percentual?: number; situacao?: string };
+
+/** Chave de dedup pela combinação COMPLETA (relação + qualificação + origem + data). */
+function evidenceKey(e: RelationshipEvidence): string {
+  return [e.relation, e.qualificacao ?? '', e.origem ?? '', e.dataEntrada ?? ''].join(' ');
+}
+
+/** Deduplicação pela combinação completa + ordenação determinística (nunca depende da ordem de chegada). */
+function dedupeAndSortEvidencias(list: EvidenceWithExtras[]): EvidenceWithExtras[] {
+  const byKey = new Map<string, EvidenceWithExtras>();
+  for (const e of list) byKey.set(evidenceKey(e), e);
+  return [...byKey.values()].sort((a, b) => evidenceKey(a).localeCompare(evidenceKey(b)));
+}
+
+function pickPrimaryEvidence(evidencias: EvidenceWithExtras[]): EvidenceWithExtras | undefined {
+  if (evidencias.length === 0) return undefined;
+  return [...evidencias].sort((a, b) => {
+    const pr = PRIMARY_RELATION_PRIORITY.indexOf(a.relation) - PRIMARY_RELATION_PRIORITY.indexOf(b.relation);
+    if (pr !== 0) return pr;
+    const oc = (a.origem ?? '').localeCompare(b.origem ?? '');
+    if (oc !== 0) return oc;
+    const qc = (a.qualificacao ?? '').localeCompare(b.qualificacao ?? '');
+    if (qc !== 0) return qc;
+    return (a.dataEntrada ?? '').localeCompare(b.dataEntrada ?? '');
+  })[0];
+}
+
+/**
+ * Reconstrói todo o `RelationshipMeta` a partir de `evidencias` (fonte
+ * única de verdade) — os campos plurais e os singulares "principais"
+ * (incluindo percentual/situacao) são sempre DERIVADOS, nunca acumulados
+ * em paralelo, então não há como os mecanismos divergirem nem depender de
+ * qual fonte respondeu primeiro.
+ */
+function buildMeta(evidenciasIn: EvidenceWithExtras[]): RelationshipMeta {
+  const evidencias = dedupeAndSortEvidencias(evidenciasIn);
+  const primary = pickPrimaryEvidence(evidencias);
   return {
-    percentual: pick('percentual'),
-    dataEntrada: pick('dataEntrada'),
-    situacao: pick('situacao'),
-    origem: pick('origem'),
-    funcao: pick('funcao'),
-    relations: sortRelations([...(a.relations ?? [typeA]), typeB]),
-    qualificacoes: sortStrings([...(a.qualificacoes ?? []), ...(b.funcao ? [b.funcao] : [])]),
-    origens: sortStrings([...(a.origens ?? []), ...(b.origem ? [b.origem] : [])]),
-    datasEntrada: sortStrings([...(a.datasEntrada ?? []), ...(b.dataEntrada ? [b.dataEntrada] : [])]),
+    percentual: primary?.percentual,
+    situacao: primary?.situacao,
+    funcao: primary?.qualificacao,
+    origem: primary?.origem,
+    dataEntrada: primary?.dataEntrada,
+    relations: sortRelations(evidencias.map((e) => e.relation)),
+    qualificacoes: sortStrings(evidencias.map((e) => e.qualificacao).filter((x): x is string => !!x)),
+    origens: sortStrings(evidencias.map((e) => e.origem).filter((x): x is string => !!x)),
+    datasEntrada: sortStrings(evidencias.map((e) => e.dataEntrada).filter((x): x is string => !!x)),
+    evidencias,
   };
+}
+
+/** Extrai os CPFs válidos dos sócios pessoa física de um resultado de empresa — usado pro prefetch automático da APIFull. */
+function extractPartnerCpfs(partners: CompanyLookupResult['partners']): string[] {
+  return partners
+    .map((p) => p.person?.cpf)
+    .filter((cpf): cpf is string => !!cpf)
+    .map(onlyDigits)
+    .filter(isValidCPF);
 }
 
 /**
@@ -155,10 +213,18 @@ function mergeMeta(a: RelationshipMeta, typeA: RelationType, b: RelationshipMeta
  * (source, target) — independente do `type`. Evita aresta duplicada quando
  * a mesma relação pessoa↔empresa é informada por duas fontes diferentes
  * (ex.: APIFull cria a relação primeiro, FonteData chega depois com a
- * mesma pessoa), acumulando todas as qualificações em vez de perder uma
- * delas (ver `mergeMeta`).
+ * mesma pessoa), acumulando a evidência de cada fonte em vez de perder uma
+ * delas (ver `buildMeta`).
  */
 export function addOrMergeLink(links: GraphLink[], source: string, target: string, type: RelationType, meta: RelationshipMeta) {
+  const newEvidence: EvidenceWithExtras = {
+    relation: type,
+    qualificacao: meta.funcao,
+    origem: meta.origem,
+    dataEntrada: meta.dataEntrada,
+    percentual: meta.percentual,
+    situacao: meta.situacao,
+  };
   const existingIdx = links.findIndex((l) => {
     const s = typeof l.source === 'string' ? l.source : l.source.id;
     const t = typeof l.target === 'string' ? l.target : l.target.id;
@@ -166,17 +232,11 @@ export function addOrMergeLink(links: GraphLink[], source: string, target: strin
   });
   if (existingIdx >= 0) {
     const existing = links[existingIdx];
-    links[existingIdx] = { ...existing, meta: mergeMeta(existing.meta, existing.type, meta, type) };
+    const evidencias = [...((existing.meta.evidencias as EvidenceWithExtras[] | undefined) ?? []), newEvidence];
+    links[existingIdx] = { ...existing, meta: buildMeta(evidencias) };
     return;
   }
-  const initialMeta: RelationshipMeta = {
-    ...meta,
-    relations: [type],
-    qualificacoes: meta.funcao ? [meta.funcao] : [],
-    origens: meta.origem ? [meta.origem] : [],
-    datasEntrada: meta.dataEntrada ? [meta.dataEntrada] : [],
-  };
-  links.push({ id: linkId(source, target, type), source, target, type, meta: initialMeta });
+  links.push({ id: linkId(source, target, type), source, target, type, meta: buildMeta([newEvidence]) });
 }
 
 /**
@@ -355,6 +415,10 @@ async function processPendingSociedades(
         succeededCount += 1;
         set(mergeCompanyResult(get(), res.value, targetDepth, { partnerDepth: targetDepth }));
         usePersonProfileStore.getState().markSociedadeOutcome(cpf, cnpj, 'succeeded');
+        // Sócios da empresa recém-descoberta já começam a ser preparados em segundo
+        // plano na APIFull — quando o usuário avançar pra próxima camada, o perfil
+        // (ou ao menos a posição na fila) já estará adiantado.
+        usePersonProfileStore.getState().prefetchProfiles(extractPartnerCpfs(res.value.partners));
       } else {
         failedCount += 1;
         usePersonProfileStore.getState().markSociedadeOutcome(cpf, cnpj, 'failed');
@@ -500,6 +564,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   startSearch: async (cnpj: string) => {
     const state = get();
     const provider = state.providers[state.providerMode];
+    // Nova pesquisa principal cancela a fila pendente (ainda não iniciada) da pesquisa
+    // anterior — uma requisição já em andamento não é interrompida, só termina em cache.
+    usePersonProfileStore.getState().cancelPendingQueue();
     set((s) => ({
       loading: true,
       error: null,
@@ -517,6 +584,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       const merged = mergeCompanyResult(get(), result, 0);
       const rootId = companyId(result.company.cnpj);
       set({ ...merged, rootId, loading: false, breadcrumb: [rootId], currentLayer: 1, layerLoading: false });
+      // Prefetch automático em segundo plano: os sócios já ficam disponíveis (ou quase)
+      // no painel/próxima camada sem bloquear a liberação do mapa acima.
+      usePersonProfileStore.getState().prefetchProfiles(extractPartnerCpfs(result.partners));
     } catch (e) {
       set({ loading: false, error: e instanceof Error ? e.message : 'Erro na consulta' });
     }

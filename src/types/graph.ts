@@ -60,21 +60,34 @@ export interface GraphNode {
   fy?: number;
 }
 
+/**
+ * Uma "evidência" é o registro completo de uma fonte para uma relação:
+ * preserva a associação entre relação, qualificação, origem e data —
+ * fonte única de verdade para os campos derivados de `RelationshipMeta`
+ * (ver `src/store/graphStore.ts`: `buildMeta`/`pickPrimaryEvidence`).
+ */
+export interface RelationshipEvidence {
+  relation: RelationType;
+  qualificacao?: string;
+  origem?: string;
+  dataEntrada?: string;
+}
+
 export interface RelationshipMeta {
   /** percentual de participação (0–100), quando conhecido */
   percentual?: number;
-  /** data de entrada "principal" (primeira preenchida) — mantida por compatibilidade */
+  /** data de entrada "principal" — derivada da evidência primária (prioridade fixa, não por ordem de chegada) */
   dataEntrada?: string;
   situacao?: string;
-  /** origem "principal" (primeira preenchida) — mantida por compatibilidade */
+  /** origem "principal" — derivada da evidência primária */
   origem?: string;
-  /** função/qualificação "principal" (primeira preenchida) — mantida por compatibilidade */
+  /** função/qualificação "principal" — derivada da evidência primária */
   funcao?: string;
   /**
    * Todas as qualificações mapeadas (ex.: sócio confirmado por uma fonte e
    * administrador por outra) — uma única aresta visual acumula todas, sem
-   * duplicar. Ordenado de forma estável, independente da ordem de chegada
-   * das respostas das APIs.
+   * duplicar. Derivado de `evidencias`, ordenado de forma estável,
+   * independente da ordem de chegada das respostas das APIs.
    */
   relations?: RelationType[];
   /** Texto bruto de qualificação de cada fonte que contribuiu para a relação, sem duplicar. */
@@ -83,6 +96,8 @@ export interface RelationshipMeta {
   origens?: string[];
   /** Todas as datas de entrada distintas conhecidas, sem duplicar. */
   datasEntrada?: string[];
+  /** Registro completo por fonte — relação+qualificação+origem+data associadas, deduplicadas pela combinação completa. */
+  evidencias?: RelationshipEvidence[];
 }
 
 export interface GraphLink {

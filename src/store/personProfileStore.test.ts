@@ -17,6 +17,11 @@ function resetStore() {
     requestsByCpf: new Map(),
     errorsByCpf: new Map(),
     sociedadesStatusByCpf: new Map(),
+    queue: [],
+    processing: false,
+    queueTotal: 0,
+    queueDone: 0,
+    queueFailed: 0,
   });
 }
 
@@ -60,6 +65,118 @@ describe('personProfileStore.loadProfile', () => {
     expect(profile).toEqual(profileFixture);
     expect(usePersonProfileStore.getState().errorsByCpf.has(CPF)).toBe(false);
     expect(mockedGetProfile).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('fila sequencial (concorrência 1)', () => {
+  beforeEach(() => {
+    resetStore();
+    mockedGetProfile.mockReset();
+  });
+
+  const CPF_A = '11144477735';
+  const CPF_B = '52998224725';
+
+  /** Espera a fila esvaziar por completo — evita que um teste "vaze" estado pro próximo (workerRunning é module-scope). */
+  async function drainQueue() {
+    await vi.waitFor(() => {
+      const s = usePersonProfileStore.getState();
+      if (s.processing || s.queue.length > 0) throw new Error('fila ainda processando');
+    });
+  }
+
+  it('5. nunca chama a APIFull duas vezes em paralelo — concorrência máxima 1', async () => {
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const deferreds: Array<() => void> = [];
+    mockedGetProfile.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          inFlight += 1;
+          maxInFlight = Math.max(maxInFlight, inFlight);
+          deferreds.push(() => {
+            inFlight -= 1;
+            resolve(profileFixture);
+          });
+        }),
+    );
+
+    const p1 = usePersonProfileStore.getState().loadProfile(CPF_A);
+    usePersonProfileStore.getState().prefetchProfiles([CPF_B]);
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(inFlight).toBe(1); // só 1 chamada real em voo mesmo com 2 CPFs enfileirados
+
+    deferreds[0]();
+    await p1;
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(inFlight).toBe(1);
+    deferreds[1]?.();
+
+    expect(maxInFlight).toBe(1);
+    await drainQueue();
+  });
+
+  it('6. CPF duplicado não entra duas vezes na fila', async () => {
+    mockedGetProfile.mockResolvedValue(profileFixture);
+    usePersonProfileStore.getState().prefetchProfiles([CPF_A, CPF_B, CPF_B]);
+    // CPF_A começa a ser processado de imediato (sai da fila); CPF_B só pode entrar 1x, mesmo pedido 2x.
+    expect(usePersonProfileStore.getState().queue).toEqual([CPF_B]);
+    await drainQueue();
+  });
+
+  it('7. perfil já carregado (ou em voo) é reaproveitado entre clique no painel e prefetch por camada', async () => {
+    mockedGetProfile.mockResolvedValue(profileFixture);
+    usePersonProfileStore.getState().prefetchProfiles([CPF_A]);
+    const fromClick = await usePersonProfileStore.getState().loadProfile(CPF_A);
+    expect(fromClick).toEqual(profileFixture);
+    expect(mockedGetProfile).toHaveBeenCalledTimes(1);
+
+    // nova "camada" tentando o mesmo CPF depois de já carregado — reaproveita o cache
+    await usePersonProfileStore.getState().loadProfile(CPF_A);
+    expect(mockedGetProfile).toHaveBeenCalledTimes(1);
+  });
+
+  it('8. falha de um CPF não para a fila — o próximo é processado normalmente', async () => {
+    mockedGetProfile.mockRejectedValueOnce(new Error('falhou')).mockResolvedValueOnce(profileFixture);
+    usePersonProfileStore.getState().prefetchProfiles([CPF_A, CPF_B]);
+    await drainQueue();
+    expect(usePersonProfileStore.getState().errorsByCpf.get(CPF_A)).toBe('falhou');
+    expect(usePersonProfileStore.getState().profilesByCpf.get(CPF_B)).toEqual(profileFixture);
+  });
+
+  it('9. nova pesquisa cancela os itens pendentes (ainda não iniciados) da fila anterior', async () => {
+    let releaseCurrent: (() => void) | undefined;
+    mockedGetProfile.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          releaseCurrent = () => resolve(profileFixture);
+        }),
+    );
+    const CPF_D = '39053344705'; // CPF válido sintético adicional
+    usePersonProfileStore.getState().prefetchProfiles([CPF_A, CPF_B]);
+    await Promise.resolve();
+    // CPF_A já começou a ser processado (saiu da fila); CPF_B ainda está pendente.
+    expect(usePersonProfileStore.getState().queue).toEqual([CPF_B]);
+
+    usePersonProfileStore.getState().cancelPendingQueue();
+    expect(usePersonProfileStore.getState().queue).toEqual([]);
+    expect(usePersonProfileStore.getState().requestsByCpf.has(CPF_B)).toBe(false);
+
+    usePersonProfileStore.getState().prefetchProfiles([CPF_D]);
+    expect(usePersonProfileStore.getState().queue).toEqual([CPF_D]);
+
+    // a requisição em andamento (CPF_A) não foi destrutivamente cancelada — ainda completa normalmente.
+    releaseCurrent?.();
+    await vi.waitFor(() => {
+      if (!usePersonProfileStore.getState().profilesByCpf.has(CPF_A)) throw new Error('CPF_A ainda pendente');
+    });
+    expect(usePersonProfileStore.getState().profilesByCpf.get(CPF_A)).toEqual(profileFixture);
+
+    releaseCurrent?.(); // agora já reatribuído pro resolver do CPF_D (fila seguiu automaticamente)
+    await drainQueue();
+    expect(usePersonProfileStore.getState().profilesByCpf.get(CPF_D)).toEqual(profileFixture);
   });
 });
 

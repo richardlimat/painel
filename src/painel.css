@@ -590,6 +590,32 @@
   flex: 1;
   overflow-y: auto;
 }
+.queue-progress {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 18px 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+.queue-progress-spinner {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid #d1d5db;
+  border-top-color: #6b7280;
+  animation: queue-progress-spin 0.8s linear infinite;
+  flex: none;
+}
+@keyframes queue-progress-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .entity-head {
   padding: 24px 18px 15px;
   display: flex;
@@ -1307,4 +1333,39 @@
   font-size: 10px;
   text-decoration: underline;
   padding: 0;
+}
+.profile-search {
+  display: block;
+  margin-bottom: 4px;
+}
+.profile-search input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 12px;
+}
+.profile-search input:focus {
+  outline: 1px solid var(--accent);
+  outline-offset: -1px;
+}
+/* Categoria (nível externo) recebe um pouco mais de destaque que a chave aninhada dentro dela */
+.profile-sections > .profile-section > .profile-section-header {
+  font-weight: 700;
+}
+.profile-sections > .profile-section .profile-section-body > .profile-section {
+  margin-bottom: 6px;
+}
+.profile-sections > .profile-section .profile-section-body > .profile-section:last-child {
+  margin-bottom: 0;
+}
+.profile-row mark,
+.profile-section-title mark {
+  background: #fde68a;
+  color: inherit;
+  border-radius: 2px;
+  padding: 0 1px;
 }

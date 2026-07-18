@@ -6,6 +6,8 @@
  * `URL.createObjectURL`/`revokeObjectURL` ficam no componente.
  */
 
+import { formatCurrency, formatDate } from './format';
+
 export const MAX_RENDER_DEPTH = 6;
 export const MAX_RENDER_ITEMS = 50;
 
@@ -37,6 +39,43 @@ export function describePrimitive(value: unknown): string {
   if (typeof value === 'boolean') return value ? 'Sim' : 'Não';
   if (typeof value === 'string') return value.trim() === '' ? 'Não informado' : value;
   return String(value);
+}
+
+const HTML_TAG_RE = /<[^>]*>/g;
+
+/**
+ * Remove marcação HTML de uma string antes de exibir — nunca
+ * `dangerouslySetInnerHTML` em lugar nenhum do painel, então tag alguma
+ * chega a ser interpretada pelo navegador; isto só limpa o texto visível
+ * (aplicado a qualquer campo com cara de HTML, não só `linhaDoTempo`).
+ */
+export function stripHtmlTags(value: string): string {
+  return value.replace(HTML_TAG_RE, '');
+}
+
+const DATE_KEY_HINT_RE = /(data|dt_|nascimento|entrada|saida|abertura|validade|emissao|vencimento)/;
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2})?)?$/;
+const MONEY_KEY_HINT_RE = /(valor|renda|salario|salário|capital|patrimonio|patrimônio|preco|preço|credito|crédito|divida|dívida|receita|faturamento)/;
+
+/**
+ * Formatação por tipo/nome de campo (item 8): datas (ISO ou nome de campo
+ * sugerindo data) em DD/MM/AAAA; número com nome de campo sugerindo dinheiro
+ * em reais; string comum tem HTML removido antes de exibir; demais tipos
+ * caem em `describePrimitive` (booleano→Sim/Não, null/vazio→"Não informado").
+ */
+export function formatScalarValue(keyName: string, value: unknown): string {
+  const normalizedKey = keyName.toLowerCase();
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '') return 'Não informado';
+    const looksLikeDate = ISO_DATE_RE.test(trimmed) || (DATE_KEY_HINT_RE.test(normalizedKey) && !Number.isNaN(Date.parse(trimmed)));
+    if (looksLikeDate) return formatDate(trimmed);
+    return stripHtmlTags(value);
+  }
+  if (typeof value === 'number' && MONEY_KEY_HINT_RE.test(normalizedKey)) {
+    return formatCurrency(value);
+  }
+  return describePrimitive(value);
 }
 
 /** Limita quantos itens de um array são renderizados diretamente. */

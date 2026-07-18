@@ -11,6 +11,7 @@ const PERSON_CPF = '11144477735';
 const OUTRO_SOCIO_CPF = '52998224725';
 const NEW_CNPJ = '11222333000181';
 const FAILING_CNPJ = '44556677000186';
+const CNPJ_2 = '10000002118569';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
@@ -55,6 +56,11 @@ function resetStores() {
     requestsByCpf: new Map(),
     errorsByCpf: new Map(),
     sociedadesStatusByCpf: new Map(),
+    queue: [],
+    processing: false,
+    queueTotal: 0,
+    queueDone: 0,
+    queueFailed: 0,
   });
 }
 
@@ -287,7 +293,7 @@ describe('addOrMergeLink — acumula qualificações de fontes diferentes sem pe
     expect(links[0].meta.origens).toEqual(['APIFull / sociedades', 'FonteData']);
   });
 
-  it('5. preserva metadados das duas fontes (origens e datas distintas), sem substituir valor válido por vazio', () => {
+  it('5. preserva metadados das duas fontes (origens e datas distintas); campos principais vêm da evidência primária (prioridade fixa, não a que chegou primeiro)', () => {
     const links: GraphLink[] = [];
     addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
     addOrMergeLink(links, PESSOA, EMPRESA, 'ADMINISTRADOR', fonteDataMeta);
@@ -295,9 +301,188 @@ describe('addOrMergeLink — acumula qualificações de fontes diferentes sem pe
     const meta = links[0].meta;
     expect(meta.origens).toEqual(['APIFull / sociedades', 'FonteData']);
     expect(meta.datasEntrada).toEqual(['2024-01-01', '2024-06-01']);
-    // campos "principais" (compatibilidade) preservam o primeiro valor válido, não ficam vazios
-    expect(meta.origem).toBe('APIFull / sociedades');
-    expect(meta.dataEntrada).toBe('2024-01-01');
-    expect(meta.funcao).toBe('Sócio');
+    // campos "principais" (compatibilidade) vêm da evidência de maior prioridade (ADMINISTRADOR),
+    // não da que chegou primeiro (que foi SOCIO/APIFull) — prioridade fixa, não ordem de chegada.
+    expect(meta.origem).toBe('FonteData');
+    expect(meta.dataEntrada).toBe('2024-06-01');
+    expect(meta.funcao).toBe('Sócio-Administrador');
+  });
+
+  it('1. evidências preservam a associação completa entre relação, qualificação, origem e data de cada fonte', () => {
+    const links: GraphLink[] = [];
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+    addOrMergeLink(links, PESSOA, EMPRESA, 'ADMINISTRADOR', fonteDataMeta);
+
+    expect(links[0].meta.evidencias).toEqual([
+      expect.objectContaining({
+        relation: 'ADMINISTRADOR',
+        qualificacao: 'Sócio-Administrador',
+        origem: 'FonteData',
+        dataEntrada: '2024-06-01',
+      }),
+      expect.objectContaining({
+        relation: 'SOCIO',
+        qualificacao: 'Sócio',
+        origem: 'APIFull / sociedades',
+        dataEntrada: '2024-01-01',
+      }),
+    ]);
+  });
+
+  it('1b. mesma empresa/pessoa/qualificação: não duplica evidência (dedup pela combinação completa)', () => {
+    const links: GraphLink[] = [];
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+    expect(links[0].meta.evidencias).toHaveLength(1);
+  });
+
+  it('2. resultado completo (evidencias + todos os campos derivados) não depende da ordem de chegada das APIs', () => {
+    const linksA: GraphLink[] = [];
+    addOrMergeLink(linksA, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+    addOrMergeLink(linksA, PESSOA, EMPRESA, 'ADMINISTRADOR', fonteDataMeta);
+
+    const linksB: GraphLink[] = [];
+    addOrMergeLink(linksB, PESSOA, EMPRESA, 'ADMINISTRADOR', fonteDataMeta);
+    addOrMergeLink(linksB, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+
+    expect(linksA[0].meta).toEqual(linksB[0].meta);
+  });
+});
+
+describe('prefetch automático de perfis via APIFull (fila de segundo plano)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+  let apiFullCallCount = 0;
+
+  beforeEach(() => {
+    resetStores();
+    apiFullCallCount = 0;
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  async function drainProfileQueue() {
+    await vi.waitFor(() => {
+      const s = usePersonProfileStore.getState();
+      if (s.processing || s.queue.length > 0) throw new Error('fila de perfis ainda processando');
+    });
+  }
+
+  it('4. startSearch dispara prefetch automático dos sócios pessoa física em segundo plano', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        apiFullCallCount += 1;
+        return apiFullSuccess([]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [
+          { nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF },
+          { nome: 'OUTRO SOCIO', cargo: 'Sócio', documento: OUTRO_SOCIO_CPF },
+        ]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startSearch(NEW_CNPJ);
+    await drainProfileQueue();
+
+    expect(usePersonProfileStore.getState().profilesByCpf.has(PERSON_CPF)).toBe(true);
+    expect(usePersonProfileStore.getState().profilesByCpf.has(OUTRO_SOCIO_CPF)).toBe(true);
+    expect(apiFullCallCount).toBe(2);
+  });
+
+  it('10. prefetch nunca altera o grafo — só popula o cache de perfis, nunca adiciona nós/camadas', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        // o perfil pré-carregado já revela uma NOVA empresa em sociedades[] — isso
+        // não pode aparecer no grafo antes do usuário clicar '+'.
+        return apiFullSuccess([
+          {
+            cnpj: CNPJ_2,
+            razao_social: 'EMPRESA DESCOBERTA SO NO PERFIL',
+            qualificacao_socio_descricao: 'Sócio',
+            documento_socio: PERSON_CPF,
+            nome_socio: 'FULANO DE TAL',
+          },
+        ]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startSearch(NEW_CNPJ);
+    const nodesRightAfterSearch = useGraphStore.getState().nodeIndex.size;
+    await drainProfileQueue();
+
+    expect(usePersonProfileStore.getState().profilesByCpf.has(PERSON_CPF)).toBe(true);
+    // nó da empresa só apareceu no perfil pré-carregado — não pode ter entrado no grafo
+    expect(useGraphStore.getState().nodeIndex.has(companyId(CNPJ_2))).toBe(false);
+    expect(useGraphStore.getState().nodeIndex.size).toBe(nodesRightAfterSearch);
+  });
+
+  it('11. próxima camada reaproveita o perfil já pré-carregado — não rechama a APIFull pro mesmo CPF', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        apiFullCallCount += 1;
+        return apiFullSuccess([]); // sem sociedades novas — só testa reaproveitamento do perfil
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startSearch(NEW_CNPJ);
+    await drainProfileQueue();
+    expect(apiFullCallCount).toBe(1); // prefetch já consultou o único sócio pessoa física
+
+    await useGraphStore.getState().nextLayer(); // avança e expande a pessoa (fronteira)
+    expect(apiFullCallCount).toBe(1); // reaproveitou o cache — nenhuma chamada nova
+  });
+
+  it('12. sócios de uma empresa recém-mesclada na camada seguinte já são enfileirados automaticamente', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        apiFullCallCount += 1;
+        if (apiFullCallCount === 1) {
+          // 1ª chamada: perfil do sócio original, que revela uma nova empresa (CNPJ_2)
+          return apiFullSuccess([
+            {
+              cnpj: CNPJ_2,
+              razao_social: 'EMPRESA CAMADA 3',
+              qualificacao_socio_descricao: 'Sócio',
+              documento_socio: PERSON_CPF,
+              nome_socio: 'FULANO DE TAL',
+            },
+          ]);
+        }
+        return apiFullSuccess([]); // sócio novo da CNPJ_2, sem mais sociedades
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      if (url.includes(`CNPJ=${CNPJ_2}`)) {
+        return fonteDataCompany(CNPJ_2, [
+          { nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF },
+          { nome: 'SOCIO NOVO DA CAMADA 3', cargo: 'Sócio', documento: OUTRO_SOCIO_CPF },
+        ]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startSearch(NEW_CNPJ);
+    await drainProfileQueue(); // prefetch inicial (só PERSON_CPF) esvazia a fila
+
+    await useGraphStore.getState().nextLayer(); // expande a pessoa: descobre CNPJ_2 e mescla seus sócios
+    await drainProfileQueue(); // aguarda o prefetch (fire-and-forget) disparado após o merge da nova empresa
+
+    // o novo sócio (OUTRO_SOCIO_CPF) descoberto na empresa CNPJ_2 já deve estar
+    // pré-carregado, sem qualquer ação extra do usuário.
+    expect(usePersonProfileStore.getState().profilesByCpf.has(OUTRO_SOCIO_CPF)).toBe(true);
   });
 });
