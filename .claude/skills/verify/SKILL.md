@@ -23,10 +23,16 @@ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/   # espera 200
 `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (passe como `executablePath`).
 Scripts .mjs fora do repo precisam de um symlink para `node_modules` (ESM ignora NODE_PATH).
 
-Fluxo principal a dirigir (modo Demonstração — determinístico, sem rede).
+O único provedor de dados é a FonteData (API comercial, real, sem modo
+demonstração): a expansão end-to-end depende de rede externa e de
+`VITE_FONTEDATA_API_KEY` configurada em `.env` antes do build/dev — sem a
+chave, toda consulta falha com "Chave de API da FonteData ausente ou
+inválida". Não há mais CNPJ fictício determinístico para smoke test.
+
+Fluxo principal a dirigir (requer chave válida e um CNPJ real conhecido).
 Os nós do grafo são DOM (React Flow), seletor `.rf-entity`:
 
-1. Preencher `#cnpj` com `12.345.678/0001-90`, submeter → `page.waitForSelector('.rf-entity')`.
+1. Preencher `#cnpj` com um CNPJ real válido, submeter → `page.waitForSelector('.rf-entity')`.
 2. Clique simples em `.rf-entity` → seleciona e abre `.details.open`; DUPLO clique → expande.
    Controle de camadas: `.layer-control` (− / "Camada N" / +) no canto superior esquerdo.
    Forças: `.map-config-btn` abre painel com sliders `input[aria-label="Força de repulsão"]`
@@ -41,8 +47,11 @@ Os nós do grafo são DOM (React Flow), seletor `.rf-entity`:
 
 ## Pegadinhas
 
-- A raiz do modo demo `12345678000190` nasce com situação BAIXADA (nó vermelho): é esperado.
-- O modo BrasilAPI depende de rede externa e não expande pessoas (por design).
+- Sem `VITE_FONTEDATA_API_KEY` válida não dá para verificar nada além do build/launch
+  estático (tela inicial); qualquer submit de CNPJ vai falhar.
+- A FonteData não expande pessoas (busca reversa CPF → empresas não suportada, por
+  design) — duplo clique num nó de pessoa mostra o aviso `notice`, não expande.
 - "Recolher Tudo" durante "Expandir Tudo" cancela a expansão via `graphEpoch` — testar esse
   probe se mexer na lógica de expansão do store.
-- Contagens do "Expandir Tudo" variam com o tempo de espera (a expansão é em ondas).
+- Contagens do "Expandir Tudo" variam com o tempo de espera (a expansão é em ondas) e com
+  o tamanho real do quadro societário do CNPJ usado no teste (não é mais determinístico).
