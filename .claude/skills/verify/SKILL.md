@@ -23,16 +23,22 @@ curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:4173/   # espera 200
 `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (passe como `executablePath`).
 Scripts .mjs fora do repo precisam de um symlink para `node_modules` (ESM ignora NODE_PATH).
 
-Fluxo principal a dirigir (modo Demonstração — determinístico, sem rede):
+Fluxo principal a dirigir (modo Demonstração — determinístico, sem rede).
+Os nós do grafo são DOM (React Flow), seletor `.rf-entity`:
 
-1. Preencher `#cnpj` com `12.345.678/0001-90`, submeter → esperar `canvas` + ~2,5s de física.
-2. Clicar no centro do canvas → nó raiz selecionado, painel `[role=dialog]` abre.
-3. `text=⤢ Expandir Tudo` → rede cresce em ondas (esperar ~6s).
-4. Painéis: `text=📊 Estatísticas`, `text=🕑 Timeline`, `text=☰ Filtros`.
-5. Exportar: `text=⬇ Exportar` → itens do menu; capturar com `page.waitForEvent('download')`.
+1. Preencher `#cnpj` com `12.345.678/0001-90`, submeter → `page.waitForSelector('.rf-entity')`.
+2. Clicar em `.rf-entity.person` → expande as empresas da pessoa e abre `.details.open`.
+3. `button:has-text("Expandir Tudo")` → rede cresce em ondas (esperar ~8s até estabilizar).
+4. Painéis: `button:has-text("Estatísticas")` (painel direito, abas Indicadores/Linha do tempo),
+   filtros na sidebar esquerda (`.filter-row`, `.range`).
+5. Busca: `input[aria-label="Buscar no grafo"]` + Enter → centraliza o primeiro resultado.
+6. Exportar: `button:has-text("Exportar")` → `.export-menu button`; capturar com
+   `page.waitForEvent('download')`.
 
 ## Pegadinhas
 
-- O dropdown da busca do grafo intercepta cliques na toolbar — clicar em outro lugar antes.
 - A raiz do modo demo `12345678000190` nasce com situação BAIXADA (nó vermelho): é esperado.
 - O modo BrasilAPI depende de rede externa e não expande pessoas (por design).
+- "Recolher Tudo" durante "Expandir Tudo" cancela a expansão via `graphEpoch` — testar esse
+  probe se mexer na lógica de expansão do store.
+- Contagens do "Expandir Tudo" variam com o tempo de espera (a expansão é em ondas).

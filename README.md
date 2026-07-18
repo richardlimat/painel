@@ -1,16 +1,25 @@
-# Painel Societário — Mapeamento de Relações (Graph Intelligence)
+# NEXUS — Painel de Inteligência Societária (Graph Intelligence)
 
-Módulo de inteligência societária com visualização em grafo interativo, inspirado no Neo4j:
+Módulo de inteligência societária com visualização em grafo interativo (React Flow):
 a partir de um CNPJ, o sistema descobre a estrutura societária em múltiplas camadas
 (empresa → sócios → outras empresas dos sócios → …), com expansão sob demanda e
 prevenção de loops.
 
 ![stack](https://img.shields.io/badge/React%2018-TypeScript-blue) ![vite](https://img.shields.io/badge/Vite-5-purple)
 
+## Interface
+
+Layout NEXUS em grade: topbar com busca inteligente e ações; sidebar esquerda com
+filtros (switches), profundidade e legenda; workspace central com cartões KPI,
+breadcrumb, indicador de nível e o mapa React Flow (nós circulares com cartão de
+rótulo, arestas com chip de relacionamento, controles centrais e minimapa);
+painel direito de detalhes com abas (Visão geral / Sócios / Histórico) e modo
+Estatísticas (Indicadores / Linha do tempo).
+
 ## Funcionalidades
 
-- **Grafo de força interativo** (react-force-graph-2d, renderização em canvas): pan, zoom,
-  arrastar nós (clique direito solta um nó fixado), centralização automática.
+- **Mapa interativo em React Flow** (@xyflow/react): pan, zoom, arrastar nós (posição
+  preservada), minimapa, controles, layout radial automático e botão **Reorganizar**.
 - **Expansão inteligente**: carrega inicialmente só a empresa pesquisada + sócios; cada
   clique expande a próxima camada. Botões **Expandir Tudo** (BFS até o limite de níveis,
   com teto de segurança de 600 nós) e **Recolher Tudo**.
@@ -68,9 +77,12 @@ src/
 ├── store/graphStore.ts     # Zustand: expansão BFS, dedupe/anti-loop, filtros, tema
 ├── lib/
 │   ├── filtering.ts        # filtros dinâmicos + estatísticas + grau dos nós
+│   ├── flowLayout.ts       # layout radial + posicionamento incremental
 │   ├── exporters.ts        # PNG/SVG/PDF/JSON/CSV
-│   ├── colors.ts           # identidade visual de nós e conexões
+│   ├── colors.ts           # identidade visual de nós e conexões (paleta NEXUS)
 │   └── format.ts           # CNPJ/CPF/moeda/data
-└── components/             # GraphCanvas, SidePanel, FilterPanel, StatsPanel,
-                            # Timeline, Breadcrumb, MiniMap, Legend, SearchBar, Toolbar
+├── nexus.css               # estrutura visual NEXUS (grid, painéis, nós rf-entity)
+└── components/
+    ├── flow/               # FlowCanvas, EntityNode, FloatingEdge (React Flow)
+    └── nexus/              # Topbar, FiltersSidebar, Workspace, DetailsPanel
 ```

@@ -44,6 +44,10 @@ interface GraphState {
   searchQuery: string;
   highlightedNodeId: string | null;
   focusRequest: { nodeId: string; ts: number } | null;
+  organizeRequest: number;
+  panelMode: 'entity' | 'stats';
+  /** incrementado a cada reset/recolhimento — cancela expansões em andamento */
+  graphEpoch: number;
   theme: 'light' | 'dark';
 
   setProviderMode: (m: ProviderMode) => void;
@@ -54,6 +58,9 @@ interface GraphState {
   setSearchQuery: (q: string) => void;
   focusNode: (id: string) => void;
   selectNode: (id: string | null) => void;
+  requestOrganize: () => void;
+  setPanelMode: (m: 'entity' | 'stats') => void;
+  notify: (msg: string) => void;
   clearNotice: () => void;
   startSearch: (cnpj: string) => Promise<void>;
   expandNode: (id: string) => Promise<void>;
@@ -225,6 +232,9 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   searchQuery: '',
   highlightedNodeId: null,
   focusRequest: null,
+  organizeRequest: 0,
+  panelMode: 'entity',
+  graphEpoch: 0,
   theme: document.documentElement.classList.contains('dark') ? 'dark' : 'light',
 
   setProviderMode: (m) => set({ providerMode: m }),
@@ -246,15 +256,18 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     set((s) => {
       const crumb = s.breadcrumb.filter((b) => b !== id);
       crumb.push(id);
-      return { selectedNodeId: id, breadcrumb: crumb.slice(-8) };
+      return { selectedNodeId: id, breadcrumb: crumb.slice(-8), panelMode: 'entity' };
     });
   },
+  requestOrganize: () => set((s) => ({ organizeRequest: s.organizeRequest + 1 })),
+  setPanelMode: (m) => set({ panelMode: m }),
+  notify: (msg) => set({ notice: msg }),
   clearNotice: () => set({ notice: null }),
 
   startSearch: async (cnpj: string) => {
     const state = get();
     const provider = state.providers[state.providerMode];
-    set({
+    set((s) => ({
       loading: true,
       error: null,
       nodes: [],
@@ -264,7 +277,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       breadcrumb: [],
       selectedNodeId: null,
       rootId: null,
-    });
+      graphEpoch: s.graphEpoch + 1,
+    }));
     try {
       const result = await provider.getCompany(cnpj);
       const merged = mergeCompanyResult(get(), result, 0);
@@ -284,14 +298,17 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       return;
     }
     const provider = state.providers[state.providerMode];
+    const epoch = state.graphEpoch;
     set((s) => ({ expandingIds: new Set(s.expandingIds).add(id) }));
     try {
       if (node.kind === 'company') {
         const result = await provider.getCompany(node.company!.cnpj);
+        if (get().graphEpoch !== epoch) return; // grafo foi recolhido/resetado no meio-tempo
         const merged = mergeCompanyResult(get(), result, node.depth);
         set(merged);
       } else {
         const result = await provider.getPersonCompanies(node.person!.cpf, node.person!.nome);
+        if (get().graphEpoch !== epoch) return;
         const merged = mergePersonResult(get(), result, node.depth);
         set(merged);
       }
@@ -312,10 +329,11 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   },
 
   expandAll: async () => {
-    const { maxDepth } = get();
+    const { maxDepth, graphEpoch } = get();
     set({ loading: true, notice: null });
     // BFS: expande em ondas até o limite de profundidade ou o teto de nós
     for (let round = 0; round < 50; round++) {
+      if (get().graphEpoch !== graphEpoch) break; // cancelado por recolher/reset
       const { nodeIndex, expandingIds } = get();
       if (nodeIndex.size >= EXPAND_ALL_NODE_CAP) {
         set({ notice: `Expansão interrompida ao atingir ${EXPAND_ALL_NODE_CAP} nós (limite de segurança).` });
@@ -354,17 +372,19 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       const t = typeof l.target === 'string' ? l.target : l.target.id;
       return (s === rootId || t === rootId) && keep.has(s) && keep.has(t);
     });
-    set({
+    set((s) => ({
       nodeIndex: newIndex,
       nodes: [...newIndex.values()],
       links: newLinks,
       breadcrumb: [rootId],
       selectedNodeId: null,
-    });
+      graphEpoch: s.graphEpoch + 1,
+      loading: false,
+    }));
   },
 
   reset: () =>
-    set({
+    set((s) => ({
       nodes: [],
       links: [],
       nodeIndex: new Map(),
@@ -376,5 +396,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       notice: null,
       searchQuery: '',
       highlightedNodeId: null,
-    }),
+      graphEpoch: s.graphEpoch + 1,
+      loading: false,
+    })),
 }));

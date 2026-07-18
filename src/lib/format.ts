@@ -42,6 +42,15 @@ export function formatCurrency(value?: number): string {
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 }
 
+/** Moeda compacta no estilo do mockup: R$ 48,7 mi */
+export function formatCompactCurrency(value?: number): string {
+  if (value == null) return '—';
+  if (value >= 1e9) return `R$ ${(value / 1e9).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} bi`;
+  if (value >= 1e6) return `R$ ${(value / 1e6).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} mi`;
+  if (value >= 1e3) return `R$ ${(value / 1e3).toLocaleString('pt-BR', { maximumFractionDigits: 0 })} mil`;
+  return formatCurrency(value);
+}
+
 export function formatDate(iso?: string): string {
   if (!iso) return '—';
   const dt = new Date(iso + (iso.length === 10 ? 'T12:00:00' : ''));
