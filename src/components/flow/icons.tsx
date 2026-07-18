@@ -1,4 +1,4 @@
-/** Ícones do mockup NEXUS (prédio e pessoa) */
+/** Ícones do painel (prédio e pessoa) */
 
 export function CompanyIcon({ className }: { className?: string }) {
   return (

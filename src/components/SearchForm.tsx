@@ -45,7 +45,7 @@ export function SearchForm() {
       >
         <div className="mb-6 text-center">
           <div className="mb-2 text-4xl">🕸️</div>
-          <h1 className="text-xl font-bold text-slate-900 dark:text-white">Mapeamento Societário</h1>
+          <h1 className="text-xl font-bold text-slate-900">Painel de Consultas</h1>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             Informe um CNPJ para descobrir toda a estrutura societária: sócios, empresas relacionadas e conexões
             indiretas, camada por camada.

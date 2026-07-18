@@ -1,8 +1,6 @@
 import { useEffect, useMemo } from 'react';
 import { useGraphStore } from '../../store/graphStore';
 import { computeStats } from '../../lib/filtering';
-import { formatCompactCurrency } from '../../lib/format';
-import { CompanyIcon, PersonIcon } from '../flow/icons';
 import { FlowCanvas } from '../flow/FlowCanvas';
 
 export function Workspace({ workspaceRef }: { workspaceRef: React.RefObject<HTMLDivElement> }) {
@@ -30,41 +28,6 @@ export function Workspace({ workspaceRef }: { workspaceRef: React.RefObject<HTML
   return (
     <main className="workspace" ref={workspaceRef}>
       <FlowCanvas />
-      <div className="kpis">
-        <div className="kpi">
-          <i>
-            <CompanyIcon className="mini-building" />
-          </i>
-          <div>
-            <b>{stats.totalCompanies}</b>
-            <small>Empresas</small>
-          </div>
-        </div>
-        <div className="kpi">
-          <i style={{ color: '#24a86a', background: 'rgba(24,165,104,.14)' }}>
-            <PersonIcon className="mini-building" />
-          </i>
-          <div>
-            <b>{stats.totalPeople}</b>
-            <small>Pessoas</small>
-          </div>
-        </div>
-        <div className="kpi">
-          <i style={{ color: '#8257e6', background: 'rgba(130,87,230,.14)' }}>⌁</i>
-          <div>
-            <b>{stats.totalLinks}</b>
-            <small>Conexões</small>
-          </div>
-        </div>
-        <div className="kpi">
-          <i style={{ color: '#8257e6', background: 'rgba(130,87,230,.14)' }}>$</i>
-          <div>
-            <b>{formatCompactCurrency(stats.totalCapital)}</b>
-            <small>Capital social</small>
-          </div>
-        </div>
-      </div>
-
       {breadcrumb.length > 0 && (
         <div className="crumb" aria-label="Trilha de navegação">
           {breadcrumb.map((id, i) => {

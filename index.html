@@ -3,19 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5" />
-    <meta name="theme-color" content="#0f172a" />
+    <meta name="theme-color" content="#ffffff" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🕸️</text></svg>" />
-    <title>Painel Societário — Mapeamento de Relações</title>
-    <script>
-      // Aplica o tema antes do primeiro paint para evitar flash
-      (function () {
-        var saved = localStorage.getItem('painel-theme');
-        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (saved === 'dark' || (!saved && prefersDark)) {
-          document.documentElement.classList.add('dark');
-        }
-      })();
-    </script>
+    <title>Painel de Consultas — Mapeamento Societário</title>
   </head>
   <body>
     <div id="root"></div>

@@ -21,8 +21,6 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
   const collapseAll = useGraphStore((s) => s.collapseAll);
   const requestOrganize = useGraphStore((s) => s.requestOrganize);
   const loading = useGraphStore((s) => s.loading);
-  const theme = useGraphStore((s) => s.theme);
-  const setTheme = useGraphStore((s) => s.setTheme);
   const reset = useGraphStore((s) => s.reset);
   const notify = useGraphStore((s) => s.notify);
 
@@ -77,7 +75,7 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
   return (
     <header className="topbar">
       <div className="brand">
-        <strong>NEXUS</strong>
+        <strong>Painel de Consultas</strong>
         <span>Inteligência Societária</span>
       </div>
       <label className="search">
@@ -160,13 +158,6 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
             </div>
           )}
         </div>
-        <button className="btn plain" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} title="Alternar tema claro/escuro">
-          {theme === 'dark' ? (
-            <svg className="icon" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
-          ) : (
-            <svg className="icon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z" /></svg>
-          )}
-        </button>
         <button className="btn plain" onClick={reset} title="Nova consulta">
           <svg className="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
           <span>Nova consulta</span>

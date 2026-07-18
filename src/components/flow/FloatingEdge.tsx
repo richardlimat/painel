@@ -13,7 +13,7 @@ const LABEL_WIDTH = 150; // largura do cartão rf-entity (círculo centralizado)
 
 /**
  * Aresta "flutuante": liga a borda do círculo de origem à borda do círculo de
- * destino, independentemente de onde os nós estejam (como no mockup NEXUS).
+ * destino, independentemente de onde os nós estejam (bordas circulares).
  */
 export function FloatingEdge({ id, source, target, data, markerEnd }: EdgeProps<FloatingFlowEdge>) {
   const sourceNode = useInternalNode(source);

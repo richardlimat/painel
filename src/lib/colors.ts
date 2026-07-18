@@ -1,6 +1,6 @@
 import type { GraphNode, RelationType } from '../types/graph';
 
-// ─── Identidade visual dos nós (paleta NEXUS) ─────────────────────────────────
+// ─── Identidade visual dos nós (paleta do painel) ─────────────────────────────────
 export const NODE_COLORS = {
   company: '#1671f9', // azul — empresa ativa
   companyRing: '#0d63e8',
@@ -47,7 +47,7 @@ export function nodeColor(node: GraphNode): string {
   return NODE_COLORS.company;
 }
 
-/** Classes CSS do nó no estilo NEXUS (rf-entity) */
+/** Classes CSS do nó do mapa (rf-entity) */
 export function nodeKindClass(node: GraphNode): string {
   if (node.kind === 'person') {
     return node.person?.administrador ? 'person admin' : 'person';

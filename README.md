@@ -1,4 +1,4 @@
-# NEXUS — Painel de Inteligência Societária (Graph Intelligence)
+# Painel de Consultas — Inteligência Societária (Graph Intelligence)
 
 Módulo de inteligência societária com visualização em grafo interativo (React Flow):
 a partir de um CNPJ, o sistema descobre a estrutura societária em múltiplas camadas
@@ -9,12 +9,12 @@ prevenção de loops.
 
 ## Interface
 
-Layout NEXUS em grade: topbar com busca inteligente e ações; sidebar esquerda com
-filtros (switches), profundidade e legenda; workspace central com cartões KPI,
-breadcrumb, indicador de nível e o mapa React Flow (nós circulares com cartão de
-rótulo, arestas com chip de relacionamento, controles centrais e minimapa);
-painel direito de detalhes com abas (Visão geral / Sócios / Histórico) e modo
-Estatísticas (Indicadores / Linha do tempo).
+Layout em grade, sempre em modo claro: topbar com busca inteligente e ações;
+sidebar esquerda com filtros (switches), profundidade e legenda; workspace
+central com breadcrumb, indicador de nível e o mapa React Flow (nós circulares
+com cartão de rótulo, arestas com chip de relacionamento, controles centrais e
+minimapa); painel direito de detalhes com abas (Visão geral / Sócios /
+Histórico) e modo Estatísticas (Indicadores / Linha do tempo).
 
 ## Funcionalidades
 
@@ -39,8 +39,7 @@ Estatísticas (Indicadores / Linha do tempo).
   (totais, capital somado, estados, municípios, CNAEs) e **linha do tempo** societária.
 - **Exportação**: PNG em alta resolução, SVG, PDF (preservando o layout), JSON completo
   e CSV das conexões.
-- **Tema claro/escuro** com detecção automática do sistema, layout responsivo
-  (drawers em mobile).
+- **Layout responsivo** (drawers em mobile), sempre em modo claro.
 
 ## Fontes de dados
 
@@ -79,10 +78,10 @@ src/
 │   ├── filtering.ts        # filtros dinâmicos + estatísticas + grau dos nós
 │   ├── flowLayout.ts       # layout radial + posicionamento incremental
 │   ├── exporters.ts        # PNG/SVG/PDF/JSON/CSV
-│   ├── colors.ts           # identidade visual de nós e conexões (paleta NEXUS)
+│   ├── colors.ts           # identidade visual de nós e conexões (paleta do painel)
 │   └── format.ts           # CNPJ/CPF/moeda/data
-├── nexus.css               # estrutura visual NEXUS (grid, painéis, nós rf-entity)
+├── painel.css              # estrutura visual do painel (grid, painéis, nós rf-entity)
 └── components/
     ├── flow/               # FlowCanvas, EntityNode, FloatingEdge (React Flow)
-    └── nexus/              # Topbar, FiltersSidebar, Workspace, DetailsPanel
+    └── painel/              # Topbar, FiltersSidebar, Workspace, DetailsPanel
 ```

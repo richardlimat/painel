@@ -20,7 +20,7 @@ export interface EntityNodeData extends Record<string, unknown> {
 
 export type EntityFlowNode = Node<EntityNodeData, 'entity'>;
 
-/** Nó circular do mapa societário — estrutura rf-entity do mockup NEXUS */
+/** Nó circular do mapa societário (estrutura rf-entity) */
 export const EntityNode = memo(({ data, selected }: NodeProps<EntityFlowNode>) => {
   const size = data.radius * 2;
   const style = {
