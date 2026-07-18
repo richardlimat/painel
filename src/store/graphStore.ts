@@ -101,9 +101,39 @@ function pushEvent(timeline: TimelineEvent[], ev: TimelineEvent) {
   timeline.push(ev);
 }
 
-/** Preenche campos vazios/ausentes de `a` com os de `b`, sem sobrescrever um valor válido. */
-function mergeMeta(a: RelationshipMeta, b: RelationshipMeta): RelationshipMeta {
-  const pick = <K extends keyof RelationshipMeta>(key: K): RelationshipMeta[K] => {
+/** Ordem estável de exibição — independe da ordem de chegada das respostas das APIs. */
+const RELATION_ORDER: RelationType[] = [
+  'SOCIO',
+  'ADMINISTRADOR',
+  'REPRESENTANTE_LEGAL',
+  'CONTROLADORA',
+  'CONTROLADA',
+  'FILIAL',
+  'MATRIZ',
+  'PARTICIPACAO',
+];
+
+function sortRelations(list: RelationType[]): RelationType[] {
+  return [...new Set(list)].sort((a, b) => RELATION_ORDER.indexOf(a) - RELATION_ORDER.indexOf(b));
+}
+
+function sortStrings(list: string[]): string[] {
+  return [...new Set(list)].sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Preenche campos "principais" vazios/ausentes de `a` com os de `b`, sem
+ * sobrescrever um valor válido (compatibilidade com quem lê os campos
+ * singulares), e acumula TODAS as qualificações conhecidas nos campos em
+ * lista — sem perder nenhuma quando a APIFull e a FonteData relatam
+ * qualificações diferentes para o mesmo par empresa/pessoa (ex.: sócio por
+ * uma fonte, administrador por outra). Dedup + ordenação estável garantem
+ * que o resultado final não dependa da ordem de chegada das respostas.
+ */
+function mergeMeta(a: RelationshipMeta, typeA: RelationType, b: RelationshipMeta, typeB: RelationType): RelationshipMeta {
+  const pick = <K extends 'percentual' | 'dataEntrada' | 'situacao' | 'origem' | 'funcao'>(
+    key: K,
+  ): RelationshipMeta[K] => {
     const av = a[key];
     return av === undefined || av === null || av === '' ? b[key] : av;
   };
@@ -113,6 +143,10 @@ function mergeMeta(a: RelationshipMeta, b: RelationshipMeta): RelationshipMeta {
     situacao: pick('situacao'),
     origem: pick('origem'),
     funcao: pick('funcao'),
+    relations: sortRelations([...(a.relations ?? [typeA]), typeB]),
+    qualificacoes: sortStrings([...(a.qualificacoes ?? []), ...(b.funcao ? [b.funcao] : [])]),
+    origens: sortStrings([...(a.origens ?? []), ...(b.origem ? [b.origem] : [])]),
+    datasEntrada: sortStrings([...(a.datasEntrada ?? []), ...(b.dataEntrada ? [b.dataEntrada] : [])]),
   };
 }
 
@@ -121,19 +155,28 @@ function mergeMeta(a: RelationshipMeta, b: RelationshipMeta): RelationshipMeta {
  * (source, target) — independente do `type`. Evita aresta duplicada quando
  * a mesma relação pessoa↔empresa é informada por duas fontes diferentes
  * (ex.: APIFull cria a relação primeiro, FonteData chega depois com a
- * mesma pessoa) com qualificações que mapeiam pra tipos diferentes.
+ * mesma pessoa), acumulando todas as qualificações em vez de perder uma
+ * delas (ver `mergeMeta`).
  */
-function addOrMergeLink(links: GraphLink[], source: string, target: string, type: RelationType, meta: RelationshipMeta) {
+export function addOrMergeLink(links: GraphLink[], source: string, target: string, type: RelationType, meta: RelationshipMeta) {
   const existingIdx = links.findIndex((l) => {
     const s = typeof l.source === 'string' ? l.source : l.source.id;
     const t = typeof l.target === 'string' ? l.target : l.target.id;
     return s === source && t === target;
   });
   if (existingIdx >= 0) {
-    links[existingIdx] = { ...links[existingIdx], meta: mergeMeta(links[existingIdx].meta, meta) };
+    const existing = links[existingIdx];
+    links[existingIdx] = { ...existing, meta: mergeMeta(existing.meta, existing.type, meta, type) };
     return;
   }
-  links.push({ id: linkId(source, target, type), source, target, type, meta });
+  const initialMeta: RelationshipMeta = {
+    ...meta,
+    relations: [type],
+    qualificacoes: meta.funcao ? [meta.funcao] : [],
+    origens: meta.origem ? [meta.origem] : [],
+    datasEntrada: meta.dataEntrada ? [meta.dataEntrada] : [],
+  };
+  links.push({ id: linkId(source, target, type), source, target, type, meta: initialMeta });
 }
 
 /**

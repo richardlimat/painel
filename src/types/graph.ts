@@ -63,12 +63,26 @@ export interface GraphNode {
 export interface RelationshipMeta {
   /** percentual de participação (0–100), quando conhecido */
   percentual?: number;
+  /** data de entrada "principal" (primeira preenchida) — mantida por compatibilidade */
   dataEntrada?: string;
   situacao?: string;
-  /** origem da informação (ex.: BrasilAPI, Demo, QSA) */
+  /** origem "principal" (primeira preenchida) — mantida por compatibilidade */
   origem?: string;
-  /** função/qualificação textual (ex.: Sócio-Administrador) */
+  /** função/qualificação "principal" (primeira preenchida) — mantida por compatibilidade */
   funcao?: string;
+  /**
+   * Todas as qualificações mapeadas (ex.: sócio confirmado por uma fonte e
+   * administrador por outra) — uma única aresta visual acumula todas, sem
+   * duplicar. Ordenado de forma estável, independente da ordem de chegada
+   * das respostas das APIs.
+   */
+  relations?: RelationType[];
+  /** Texto bruto de qualificação de cada fonte que contribuiu para a relação, sem duplicar. */
+  qualificacoes?: string[];
+  /** Todas as origens que confirmaram esta relação (ex.: "APIFull / sociedades", "FonteData"), sem duplicar. */
+  origens?: string[];
+  /** Todas as datas de entrada distintas conhecidas, sem duplicar. */
+  datasEntrada?: string[];
 }
 
 export interface GraphLink {

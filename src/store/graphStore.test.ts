@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 // graphStore.ts lê `document`/`localStorage` no topo do módulo (tema) — precisa de DOM.
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { GraphNode } from '../types/graph';
-import { companyId, personId, useGraphStore } from './graphStore';
+import type { GraphLink, GraphNode } from '../types/graph';
+import { addOrMergeLink, companyId, personId, useGraphStore } from './graphStore';
 import { usePersonProfileStore } from './personProfileStore';
 import { FonteDataProvider } from '../services/fontedata';
 
@@ -229,5 +229,75 @@ describe('expandNode em nó pessoa (pipeline APIFull → FonteData)', () => {
     expect(fonteDataCallsForFailingCnpj).toBe(2);
     const apiFullCalls = fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/cpf-ultra')).length;
     expect(apiFullCalls).toBe(1);
+  });
+});
+
+describe('addOrMergeLink — acumula qualificações de fontes diferentes sem perder nenhuma', () => {
+  const EMPRESA = companyId(NEW_CNPJ);
+  const PESSOA = personId(PERSON_CPF);
+
+  const apiFullMeta = { funcao: 'Sócio', origem: 'APIFull / sociedades', dataEntrada: '2024-01-01', situacao: 'ATIVO' };
+  const fonteDataMeta = {
+    funcao: 'Sócio-Administrador',
+    origem: 'FonteData',
+    dataEntrada: '2024-06-01',
+    situacao: 'ATIVA',
+  };
+
+  it('1. mesma empresa, pessoa e qualificação: não duplica', () => {
+    const links: GraphLink[] = [];
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+
+    expect(links).toHaveLength(1); // uma única conexão visual
+    expect(links[0].meta.relations).toEqual(['SOCIO']);
+    expect(links[0].meta.qualificacoes).toEqual(['Sócio']);
+    expect(links[0].meta.origens).toEqual(['APIFull / sociedades']);
+  });
+
+  it('2. mesma empresa e pessoa, qualificações diferentes: mescla sem perder nenhuma', () => {
+    const links: GraphLink[] = [];
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+    addOrMergeLink(links, PESSOA, EMPRESA, 'ADMINISTRADOR', fonteDataMeta);
+
+    expect(links).toHaveLength(1); // não cria duas linhas sobrepostas no mapa
+    expect(links[0].meta.relations).toEqual(['SOCIO', 'ADMINISTRADOR']);
+    expect(links[0].meta.qualificacoes).toEqual(['Sócio', 'Sócio-Administrador']);
+  });
+
+  it('3. APIFull respondendo antes da FonteData', () => {
+    const links: GraphLink[] = [];
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+    addOrMergeLink(links, PESSOA, EMPRESA, 'ADMINISTRADOR', fonteDataMeta);
+
+    expect(links).toHaveLength(1);
+    expect(links[0].meta.relations).toEqual(['SOCIO', 'ADMINISTRADOR']);
+    expect(links[0].meta.qualificacoes).toEqual(['Sócio', 'Sócio-Administrador']);
+    expect(links[0].meta.origens).toEqual(['APIFull / sociedades', 'FonteData']);
+  });
+
+  it('4. FonteData respondendo antes da APIFull — mesmo resultado final (ordem não importa)', () => {
+    const links: GraphLink[] = [];
+    addOrMergeLink(links, PESSOA, EMPRESA, 'ADMINISTRADOR', fonteDataMeta);
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+
+    expect(links).toHaveLength(1);
+    expect(links[0].meta.relations).toEqual(['SOCIO', 'ADMINISTRADOR']);
+    expect(links[0].meta.qualificacoes).toEqual(['Sócio', 'Sócio-Administrador']);
+    expect(links[0].meta.origens).toEqual(['APIFull / sociedades', 'FonteData']);
+  });
+
+  it('5. preserva metadados das duas fontes (origens e datas distintas), sem substituir valor válido por vazio', () => {
+    const links: GraphLink[] = [];
+    addOrMergeLink(links, PESSOA, EMPRESA, 'SOCIO', apiFullMeta);
+    addOrMergeLink(links, PESSOA, EMPRESA, 'ADMINISTRADOR', fonteDataMeta);
+
+    const meta = links[0].meta;
+    expect(meta.origens).toEqual(['APIFull / sociedades', 'FonteData']);
+    expect(meta.datasEntrada).toEqual(['2024-01-01', '2024-06-01']);
+    // campos "principais" (compatibilidade) preservam o primeiro valor válido, não ficam vazios
+    expect(meta.origem).toBe('APIFull / sociedades');
+    expect(meta.dataEntrada).toBe('2024-01-01');
+    expect(meta.funcao).toBe('Sócio');
   });
 });
