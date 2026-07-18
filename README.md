@@ -11,15 +11,16 @@ prevenção de loops.
 
 Layout em grade, sempre em modo claro: topbar com busca inteligente e ações;
 sidebar esquerda com filtros (switches), profundidade e legenda; workspace
-central com breadcrumb, indicador de nível e o mapa React Flow (nós circulares
-com cartão de rótulo, arestas com chip de relacionamento, controles centrais e
-minimapa); painel direito de detalhes com abas (Visão geral / Sócios /
-Histórico) e modo Estatísticas (Indicadores / Linha do tempo).
+central com breadcrumb, indicador de nível e o mapa (nós circulares com cartão
+de rótulo, arestas com chip de relacionamento e controles centrais); painel
+direito de detalhes com abas (Visão geral / Sócios / Histórico) e modo
+Estatísticas (Indicadores / Linha do tempo). Percentuais de participação
+societária não são exibidos nem exportados.
 
 ## Funcionalidades
 
 - **Mapa interativo em React Flow** (@xyflow/react): pan, zoom, arrastar nós (posição
-  preservada), minimapa, controles, layout radial automático e botão **Reorganizar**.
+  preservada), controles, layout radial automático e botão **Reorganizar**.
 - **Expansão inteligente**: carrega inicialmente só a empresa pesquisada + sócios; cada
   clique expande a próxima camada. Botões **Expandir Tudo** (BFS até o limite de níveis,
   com teto de segurança de 600 nós) e **Recolher Tudo**.
@@ -35,8 +36,8 @@ Histórico) e modo Estatísticas (Indicadores / Linha do tempo).
   centraliza e aplica zoom no nó encontrado.
 - **Filtros dinâmicos**: pessoas/empresas, situação cadastral, administradores, sócios,
   filiais/matrizes, participação mínima, UF, CNAE, data de abertura.
-- **Breadcrumb** de navegação, **mini mapa** da rede, **painel de estatísticas**
-  (totais, capital somado, estados, municípios, CNAEs) e **linha do tempo** societária.
+- **Breadcrumb** de navegação, **painel de estatísticas** (totais, capital somado,
+  estados, municípios, CNAEs) e **linha do tempo** societária.
 - **Exportação**: PNG em alta resolução, SVG, PDF (preservando o layout), JSON completo
   e CSV das conexões.
 - **Layout responsivo** (drawers em mobile), sempre em modo claro.

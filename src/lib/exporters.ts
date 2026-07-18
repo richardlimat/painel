@@ -51,12 +51,16 @@ export function exportJson(nodes: GraphNode[], links: GraphLink[]) {
       camada: n.depth,
       dados: n.kind === 'company' ? n.company : n.person,
     })),
-    conexoes: links.map((l) => ({
-      origem: nid(l.source),
-      destino: nid(l.target),
-      tipo: RELATION_LABELS[l.type],
-      metadados: l.meta,
-    })),
+    conexoes: links.map((l) => {
+      // percentual de participação não deve ser divulgado
+      const { percentual: _omitido, ...metadados } = l.meta;
+      return {
+        origem: nid(l.source),
+        destino: nid(l.target),
+        tipo: RELATION_LABELS[l.type],
+        metadados,
+      };
+    }),
   };
   downloadBlob(JSON.stringify(payload, null, 2), 'application/json', 'grafo-societario.json');
 }
@@ -67,7 +71,7 @@ export function exportCsv(nodes: GraphNode[], links: GraphLink[]) {
     const s = String(v ?? '');
     return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const header = ['origem', 'origem_tipo', 'destino', 'destino_tipo', 'relacao', 'percentual', 'data_entrada', 'situacao', 'origem_informacao'];
+  const header = ['origem', 'origem_tipo', 'destino', 'destino_tipo', 'relacao', 'data_entrada', 'situacao', 'origem_informacao'];
   const rows = links.map((l) => {
     const s = byId.get(nid(l.source));
     const t = byId.get(nid(l.target));
@@ -77,7 +81,6 @@ export function exportCsv(nodes: GraphNode[], links: GraphLink[]) {
       esc(t?.label ?? nid(l.target)),
       esc(t?.kind === 'company' ? 'empresa' : 'pessoa'),
       esc(RELATION_LABELS[l.type]),
-      esc(l.meta.percentual ?? ''),
       esc(l.meta.dataEntrada ?? ''),
       esc(l.meta.situacao ?? ''),
       esc(l.meta.origem ?? ''),

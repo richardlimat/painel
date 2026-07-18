@@ -8,8 +8,6 @@ import type { GraphLink, GraphNode, TimelineEvent } from '../../types/graph';
 
 const nid = (v: string | GraphNode) => (typeof v === 'string' ? v : v.id);
 
-const OWNERSHIP_SHADES = ['#07996b', '#49b584', '#82c9a5', '#b7dfc9', '#d7ecdf', '#e8f4ec'];
-
 const TL_COLORS: Record<TimelineEvent['kind'], string> = {
   abertura: '#1671f9',
   entrada_socio: '#18a568',
@@ -59,14 +57,6 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
 
   const relatedCompanies = related.filter((r) => r.other.kind === 'company');
   const relatedPeople = related.filter((r) => r.other.kind === 'person');
-
-  const ownership = useMemo(() => {
-    if (!node || node.kind !== 'company') return [];
-    return relatedPeople
-      .filter((r) => r.link.meta.percentual)
-      .sort((a, b) => (b.link.meta.percentual ?? 0) - (a.link.meta.percentual ?? 0))
-      .slice(0, 6);
-  }, [node, relatedPeople]);
 
   const nodeHistory = useMemo(
     () => (node ? timeline.filter((t) => t.nodeId === node.id).sort((a, b) => a.date.localeCompare(b.date)) : []),
@@ -189,29 +179,6 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                           </div>
                         </div>
                       </div>
-                      {ownership.length > 0 && (
-                        <>
-                          <h4 className="subheading">Participação de sócios</h4>
-                          <div className="ownership">
-                            {ownership.map((o, i) => (
-                              <i
-                                key={o.link.id}
-                                style={{
-                                  width: `${o.link.meta.percentual}%`,
-                                  background: OWNERSHIP_SHADES[i % OWNERSHIP_SHADES.length],
-                                }}
-                              />
-                            ))}
-                          </div>
-                          {ownership.map((o, i) => (
-                            <div className="owner-row" key={o.link.id}>
-                              <i style={{ background: OWNERSHIP_SHADES[i % OWNERSHIP_SHADES.length] }} />
-                              {o.other.label}
-                              <strong>{o.link.meta.percentual}%</strong>
-                            </div>
-                          ))}
-                        </>
-                      )}
                     </>
                   ) : (
                     <>
@@ -270,7 +237,6 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                       </span>
                       <span className="conn-label">{other.label}</span>
                       <span className="tag">{link.meta.funcao ?? RELATION_LABELS[link.type]}</span>
-                      {link.meta.percentual != null && <b>{link.meta.percentual}%</b>}
                     </button>
                   ))}
                 </div>
@@ -306,7 +272,6 @@ export function DetailsPanel({ open, onClose }: { open: boolean; onClose: () => 
                       )}
                     </span>
                     <span className="tag">{link.meta.funcao ?? RELATION_LABELS[link.type]}</span>
-                    {link.meta.percentual != null && <b>{link.meta.percentual}%</b>}
                   </button>
                 ))}
               </div>

@@ -4,7 +4,6 @@ import {
   BackgroundVariant,
   Controls,
   MarkerType,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   applyNodeChanges,
@@ -169,7 +168,7 @@ function FlowCanvasInner() {
       const sourceNode = nodeById.get(s);
       const involvesBaixada =
         targetNode?.company?.situacao === 'BAIXADA' || sourceNode?.company?.situacao === 'BAIXADA';
-      const label = l.meta.percentual ? `${RELATION_LABELS[l.type]} · ${l.meta.percentual}%` : RELATION_LABELS[l.type];
+      const label = RELATION_LABELS[l.type];
       return {
         id: l.id,
         source: s,
@@ -179,7 +178,6 @@ function FlowCanvasInner() {
           color,
           label,
           dashed: l.meta.situacao === 'RETIRADO' || involvesBaixada,
-          width: (l.meta.percentual ?? 0) > 50 ? 2.6 : 1.8,
         },
         markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16, color },
       };
@@ -219,19 +217,11 @@ function FlowCanvasInner() {
         maxZoom={1.8}
         nodesConnectable={false}
         edgesReconnectable={false}
-        proOptions={{ hideAttribution: false }}
+        proOptions={{ hideAttribution: true }}
         colorMode={theme}
       >
         <Background variant={BackgroundVariant.Dots} gap={18} size={1} color={theme === 'dark' ? '#2b3a55' : '#d5dde8'} />
         <Controls showInteractive={false} position="bottom-left" />
-        <MiniMap
-          position="bottom-right"
-          pannable
-          zoomable
-          nodeStrokeWidth={3}
-          nodeColor={(n) => (n.data?.color as string) ?? '#1671f9'}
-          maskColor={theme === 'dark' ? 'rgba(16,24,43,.65)' : 'rgba(247,249,252,.65)'}
-        />
       </ReactFlow>
     </div>
   );
