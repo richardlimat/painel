@@ -67,26 +67,29 @@ A camada de dados é plugável (`src/services/provider.ts`):
 
 A chamada não é feita direto do navegador para a FonteData: `api/cadastro-pj-plus.ts`
 (Vercel Edge Function) atua como proxy same-origin, repassando a consulta com
-a chave `VITE_FONTEDATA_API_KEY` só no servidor. Isso evita bloqueio de CORS
+a chave `FONTEDATA_API_KEY` só no servidor. Isso evita bloqueio de CORS
 (a FonteData é uma API servidor-a-servidor, sem CORS liberado para o
 navegador) e mantém a chave fora do bundle do cliente.
 
 ## Rodando
 
 ```bash
-cp .env.example .env   # preencha VITE_FONTEDATA_API_KEY com sua chave da FonteData
+cp .env.example .env   # preencha FONTEDATA_API_KEY com sua chave da FonteData
 npm install
 npm run dev        # http://localhost:5173 — só a UI; /api/* não é servido (ver abaixo)
 npm run build      # produção em dist/
 npm run preview
+npm run test       # Vitest (normalização de CNPJ, URL da FonteData, cache)
 ```
 
 `npm run dev`/`npm run preview` sozinhos **não** servem `/api/*` (Vite não
 conhece Vercel Functions), então a busca vai falhar localmente com esses
-comandos. Para testar o fluxo completo (incluindo a chamada real à
-FonteData) é preciso rodar via [Vercel CLI](https://vercel.com/docs/cli):
-`vercel dev` (lê `VITE_FONTEDATA_API_KEY` do `.env` automaticamente). Em
-produção/preview na Vercel, a function já funciona normalmente.
+comandos — servem só para trabalhar na UI. Para testar o fluxo completo
+(incluindo a chamada real à FonteData) é preciso rodar via
+[Vercel CLI](https://vercel.com/docs/cli): `vercel dev` (lê
+`FONTEDATA_API_KEY` do `.env` automaticamente), ou testar direto numa URL de
+deployment de Preview/Produção da Vercel com `FONTEDATA_API_KEY` configurada
+naquele ambiente.
 
 ## Arquitetura
 
