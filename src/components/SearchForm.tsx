@@ -3,33 +3,24 @@ import { motion } from 'framer-motion';
 import { useGraphStore } from '../store/graphStore';
 import { isValidCNPJ, maskCNPJ, onlyDigits } from '../lib/format';
 
-const PHASE_LABEL: Record<string, string> = {
-  company: 'Consultando empresa…',
-  'company-found': 'Empresa encontrada.',
-  profiles: 'Consultando perfis…',
-  preparing: 'Preparando mapa…',
-};
-
-/** Tela inicial: informa o CNPJ raiz e o limite de camadas */
+/**
+ * Tela inicial: informa o CNPJ raiz e o limite de camadas. Enquanto a busca
+ * está em andamento (`loading`), o App renderiza `LoadingScreen` em vez
+ * deste componente — por isso não há feedback de progresso aqui, só o
+ * resultado (erro) ou a tela de decisão de falha parcial.
+ */
 export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => void }) {
   const startSearch = useGraphStore((s) => s.startSearch);
   const retryFailedSearchProfiles = useGraphStore((s) => s.retryFailedSearchProfiles);
   const continueWithAvailableData = useGraphStore((s) => s.continueWithAvailableData);
-  const loading = useGraphStore((s) => s.loading);
   const error = useGraphStore((s) => s.error);
   const searchPhase = useGraphStore((s) => s.searchPhase);
   const searchProfilesTotal = useGraphStore((s) => s.searchProfilesTotal);
-  const searchProfilesDone = useGraphStore((s) => s.searchProfilesDone);
   const searchFailedCpfs = useGraphStore((s) => s.searchFailedCpfs);
   const maxDepth = useGraphStore((s) => s.maxDepth);
   const setMaxDepth = useGraphStore((s) => s.setMaxDepth);
   const [cnpj, setCnpj] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  const phaseLabel =
-    searchPhase === 'profiles' && searchProfilesTotal > 0
-      ? `Consultando perfis: ${searchProfilesDone} de ${searchProfilesTotal}`
-      : PHASE_LABEL[searchPhase];
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -105,12 +96,6 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
             </p>
           )}
 
-          {loading && phaseLabel && (
-            <p className="rounded-lg bg-slate-50 p-2.5 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-              {phaseLabel}
-            </p>
-          )}
-
           {searchPhase === 'awaiting-decision' && (
             <div className="space-y-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
               <p>
@@ -138,10 +123,9 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
 
           <button
             type="submit"
-            disabled={loading}
-            className="w-full rounded-xl bg-gray-900 py-3 text-sm font-semibold text-white shadow-lg shadow-gray-900/20 transition hover:bg-gray-700 disabled:opacity-50"
+            className="w-full rounded-xl bg-gray-900 py-3 text-sm font-semibold text-white shadow-lg shadow-gray-900/20 transition hover:bg-gray-700"
           >
-            {loading ? 'Consultando…' : 'Mapear estrutura societária'}
+            Mapear estrutura societária
           </button>
 
           {onOpenSavedQueries && (

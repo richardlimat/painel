@@ -3,6 +3,7 @@ import { useGraphStore } from './store/graphStore';
 import { useAuthStore } from './store/authStore';
 import { SearchForm } from './components/SearchForm';
 import { LoginForm } from './components/LoginForm';
+import { LoadingScreen } from './components/LoadingScreen';
 import { SavedQueriesList } from './components/SavedQueriesList';
 import { Topbar } from './components/painel/Topbar';
 import { FiltersSidebar } from './components/painel/FiltersSidebar';
@@ -12,6 +13,7 @@ import { DetailsPanel } from './components/painel/DetailsPanel';
 export default function App() {
   const rootId = useGraphStore((s) => s.rootId);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const loading = useGraphStore((s) => s.loading);
   const reset = useGraphStore((s) => s.reset);
   const authStatus = useAuthStore((s) => s.status);
   const checkSession = useAuthStore((s) => s.checkSession);
@@ -54,6 +56,13 @@ export default function App() {
   };
 
   if (!rootId) {
+    if (loading) {
+      return (
+        <div className="h-screen bg-slate-100 dark:bg-slate-950">
+          <LoadingScreen />
+        </div>
+      );
+    }
     return (
       <div className="h-screen bg-slate-100 dark:bg-slate-950">
         {view === 'saved' ? (

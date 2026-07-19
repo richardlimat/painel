@@ -696,7 +696,13 @@ export const useGraphStore = create<GraphState>((set, get) => ({
     const epoch = state.graphEpoch;
     const toRetry = state.searchFailedCpfs;
     if (toRetry.length === 0) return;
-    set({ searchPhase: 'profiles', searchProfilesTotal: toRetry.length, searchProfilesDone: 0, searchProfilesFailed: 0 });
+    set({
+      loading: true,
+      searchPhase: 'profiles',
+      searchProfilesTotal: toRetry.length,
+      searchProfilesDone: 0,
+      searchProfilesFailed: 0,
+    });
     const { failed } = await usePersonProfileStore.getState().runBatch(toRetry, {
       priority: true,
       onEach: (_cpf, ok) => {
@@ -722,7 +728,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         searchFailedCpfs: [],
       });
     } else {
-      set({ searchFailedCpfs: failed, searchPhase: 'awaiting-decision' });
+      set({ searchFailedCpfs: failed, searchPhase: 'awaiting-decision', loading: false });
     }
   },
 
