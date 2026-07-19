@@ -8,6 +8,7 @@
 
 import { formatCurrency, formatDate } from './format';
 import { isSafeHttpUrl } from './url';
+import { classifyKey, type MaskClass } from './mask';
 
 export const MAX_RENDER_DEPTH = 6;
 export const MAX_RENDER_ITEMS = 50;
@@ -89,6 +90,43 @@ export function formatScalarValue(keyName: string, value: unknown): string {
     return formatCurrency(value);
   }
   return describePrimitive(value);
+}
+
+/**
+ * Transforma o nome cru de uma chave (camelCase/snake_case) num rótulo
+ * legível — `dataNascimento` → "Data nascimento", `nome_mae` → "Nome mae".
+ * Só formatação visual; acentos preservados. O CSS decide maiúsculas.
+ */
+export function humanizeKey(key: string): string {
+  const cleaned = key
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[_\-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) return key;
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+/**
+ * Forma segura de exibir um valor FOLHA (não-container) do perfil. Retorna
+ * `null` quando o valor é um container (array/objeto) que o chamador deve
+ * percorrer. Concentra num único ponto as mesmas decisões de segurança da
+ * árvore de renderização (imagem/documento/mascaramento/escalar), pra que a
+ * versão em cartões (tela cheia) e a em accordion nunca divirjam.
+ */
+export type ProfileLeaf =
+  | { kind: 'image'; url: string }
+  | { kind: 'document'; base64: string }
+  | { kind: 'masked'; cls: MaskClass; value: string }
+  | { kind: 'text'; value: string };
+
+export function classifyLeaf(keyName: string, value: unknown): ProfileLeaf | null {
+  if (typeof value === 'string' && isLikelyImageUrl(keyName, value)) return { kind: 'image', url: value };
+  if (typeof value === 'string' && isLikelyDocumentBlob(keyName, value)) return { kind: 'document', base64: value };
+  const cls = classifyKey(keyName);
+  if (cls !== 'none' && typeof value === 'string' && value !== '') return { kind: 'masked', cls, value };
+  if (value === null || typeof value !== 'object') return { kind: 'text', value: formatScalarValue(keyName, value) };
+  return null; // array ou objeto — container, o chamador percorre
 }
 
 /** Limita quantos itens de um array são renderizados diretamente. */
