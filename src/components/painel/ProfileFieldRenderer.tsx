@@ -1,6 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { GraphNode } from '../../types/graph';
-import { usePersonProfileStore } from '../../store/personProfileStore';
+import { useEffect, useState, type ReactNode } from 'react';
 import { applyMask, classifyKey, type MaskClass } from '../../lib/mask';
 import {
   MAX_RENDER_DEPTH,
@@ -10,22 +8,27 @@ import {
   isLikelyDocumentBlob,
   truncateItems,
 } from '../../lib/profileRender';
-import { groupServiceResponse, type ProfileCategoryGroup } from '../../lib/profileCategories';
 import { normalizeText } from '../../lib/format';
-import { CollapsibleSection } from './CollapsibleSection';
 
-function countRecords(value: unknown): number | undefined {
+/**
+ * Renderizador genérico de campos do perfil (pessoa via APIFull ou empresa
+ * via `companyToProfileSource`) — extraído de PersonProfilePanel para ser
+ * reaproveitado tanto pelas categorias em tela cheia quanto por qualquer
+ * outra visão futura. Sem estado de fonte de dados aqui, só apresentação.
+ */
+
+export function countRecords(value: unknown): number | undefined {
   if (Array.isArray(value)) return value.length;
   if (value !== null && typeof value === 'object') return Object.keys(value).length;
   return undefined;
 }
 
-function categoryRecordCount(entries: [string, unknown][]): number {
+export function categoryRecordCount(entries: [string, unknown][]): number {
   return entries.reduce((sum, [, v]) => sum + (countRecords(v) ?? 1), 0);
 }
 
 /** Realce discreto do trecho encontrado — só o primeiro match, sem HTML perigoso (texto React puro). */
-function highlightMatch(text: string, query: string): ReactNode {
+export function highlightMatch(text: string, query: string): ReactNode {
   if (!query) return text;
   const idx = text.toLowerCase().indexOf(query.toLowerCase());
   if (idx === -1) return text;
@@ -53,7 +56,7 @@ function valueMatchesQuery(value: unknown, query: string, depth = 0): boolean {
   return false;
 }
 
-function entryMatchesQuery(key: string, value: unknown, query: string): boolean {
+export function entryMatchesQuery(key: string, value: unknown, query: string): boolean {
   return normalizeText(key).includes(query) || valueMatchesQuery(value, query);
 }
 
@@ -113,18 +116,27 @@ function MaskedValue({ value, cls }: { value: string; cls: MaskClass }) {
   );
 }
 
-function RenderValue({
+export function RenderValue({
   label,
   keyName,
   value,
   depth,
   query,
+  maskSoft = true,
 }: {
   label: string;
   keyName: string;
   value: unknown;
   depth: number;
   query: string;
+  /**
+   * Dados de empresa vindos do registro público (CNPJ, endereço, telefone…)
+   * não precisam do mascaramento "soft" pensado pra dados pessoais da
+   * APIFull — só campos "hard" (senha/credenciais) continuam sempre
+   * ocultos, em qualquer fonte. Pessoa (padrão) mantém o comportamento
+   * original.
+   */
+  maskSoft?: boolean;
 }) {
   if (depth > MAX_RENDER_DEPTH) {
     return (
@@ -144,7 +156,8 @@ function RenderValue({
     );
   }
 
-  const cls = classifyKey(keyName);
+  const rawCls = classifyKey(keyName);
+  const cls = rawCls === 'soft' && !maskSoft ? 'none' : rawCls;
   if (cls !== 'none' && typeof value === 'string' && value !== '') {
     return (
       <div className="profile-row">
@@ -168,7 +181,7 @@ function RenderValue({
       <div className="profile-array">
         {visible.map((item, i) => (
           <div className="profile-array-item" key={i}>
-            <RenderValue label={`#${i + 1}`} keyName={keyName} value={item} depth={depth + 1} query={query} />
+            <RenderValue label={`#${i + 1}`} keyName={keyName} value={item} depth={depth + 1} query={query} maskSoft={maskSoft} />
           </div>
         ))}
         {hiddenCount > 0 && <p className="profile-more">+{hiddenCount} mais</p>}
@@ -189,7 +202,7 @@ function RenderValue({
     return (
       <div className="profile-object">
         {entries.map(([k, v]) => (
-          <RenderValue key={k} label={k} keyName={k} value={v} depth={depth + 1} query={query} />
+          <RenderValue key={k} label={k} keyName={k} value={v} depth={depth + 1} query={query} maskSoft={maskSoft} />
         ))}
       </div>
     );
@@ -199,100 +212,6 @@ function RenderValue({
     <div className="profile-row">
       <span>{highlightMatch(label, query)}</span>
       <span className="profile-row-value">{highlightMatch(formatScalarValue(keyName, value), query)}</span>
-    </div>
-  );
-}
-
-function CategorySection({ group, query }: { group: ProfileCategoryGroup; query: string }) {
-  return (
-    <CollapsibleSection
-      title={highlightMatch(group.name, query)}
-      count={categoryRecordCount(group.entries)}
-      forceOpen={!!query}
-    >
-      {group.entries.length === 0 ? (
-        <p className="profile-row-value">Nenhum registro encontrado</p>
-      ) : (
-        group.entries.map(([key, value]) => (
-          <CollapsibleSection key={key} title={highlightMatch(key, query)} count={countRecords(value)} forceOpen={!!query}>
-            <RenderValue label={key} keyName={key} value={value} depth={0} query={query} />
-          </CollapsibleSection>
-        ))
-      )}
-    </CollapsibleSection>
-  );
-}
-
-/**
- * Perfil completo da APIFull, organizado em categorias (Etapa 2): busca no
- * topo filtra por nome de seção/campo/valores e força abertura das
- * categorias/chaves com resultado; sem busca, todas as 14 categorias +
- * "Outros dados" aparecem recolhidas por padrão. Carrega o perfil ao
- * selecionar a pessoa — nunca expande o grafo (isso só acontece ao avançar
- * de camada, via o botão "+"/"Expandir conexões").
- */
-export function PersonProfilePanel({ node }: { node: GraphNode }) {
-  const cpf = node.person?.cpf ?? '';
-  const loadProfile = usePersonProfileStore((s) => s.loadProfile);
-  const profile = usePersonProfileStore((s) => s.profilesByCpf.get(cpf));
-  const loading = usePersonProfileStore((s) => s.requestsByCpf.has(cpf));
-  const error = usePersonProfileStore((s) => s.errorsByCpf.get(cpf));
-
-  const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    if (cpf) void loadProfile(cpf);
-    setSearchQuery('');
-  }, [cpf, loadProfile]);
-
-  const query = normalizeText(searchQuery.trim());
-
-  const categoryGroups = useMemo(() => {
-    if (!profile) return [];
-    const groups = groupServiceResponse(profile.SERVICE_RESPONSE);
-    if (!query) return groups;
-    return groups
-      .map((g) => {
-        const nameMatches = normalizeText(g.name).includes(query);
-        const entries = nameMatches ? g.entries : g.entries.filter(([k, v]) => entryMatchesQuery(k, v, query));
-        return { ...g, entries };
-      })
-      .filter((g) => g.entries.length > 0);
-  }, [profile, query]);
-
-  if (!cpf) return null;
-
-  return (
-    <div className="profile-panel">
-      <h4 className="subheading" style={{ marginTop: 0 }}>
-        Perfil completo
-      </h4>
-      {loading && <p className="profile-status">Carregando perfil…</p>}
-      {!loading && error && (
-        <p className="profile-status profile-error">
-          <span>{error}</span>
-          <button type="button" className="btn plain" onClick={() => void loadProfile(cpf)}>
-            Tentar novamente
-          </button>
-        </p>
-      )}
-      {!loading && !error && profile && (
-        <div className="profile-sections">
-          <label className="profile-search">
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Buscar nas informações da pessoa"
-              aria-label="Buscar nas informações da pessoa"
-            />
-          </label>
-          {query && categoryGroups.length === 0 && <p className="profile-status">Nenhum registro encontrado.</p>}
-          {categoryGroups.map((group) => (
-            <CategorySection key={group.name} group={group} query={searchQuery.trim()} />
-          ))}
-        </div>
-      )}
     </div>
   );
 }

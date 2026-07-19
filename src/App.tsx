@@ -5,18 +5,26 @@ import { Topbar } from './components/painel/Topbar';
 import { FiltersSidebar } from './components/painel/FiltersSidebar';
 import { Workspace } from './components/painel/Workspace';
 import { DetailsPanel } from './components/painel/DetailsPanel';
+import { FullScreenProfile } from './components/painel/FullScreenProfile';
 
 export default function App() {
   const rootId = useGraphStore((s) => s.rootId);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
+  const panelMode = useGraphStore((s) => s.panelMode);
+  const nodeIndex = useGraphStore((s) => s.nodeIndex);
+  const selectNode = useGraphStore((s) => s.selectNode);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(false);
 
-  // selecionar um nó abre o painel de detalhes automaticamente
+  // "Estatísticas" (Topbar) abre a lateral direita; clicar numa empresa/sócio
+  // abre o perfil em tela cheia (FullScreenProfile), nunca mais a lateral.
   useEffect(() => {
-    if (selectedNodeId) setRightOpen(true);
-  }, [selectedNodeId]);
+    if (panelMode === 'stats') setRightOpen(true);
+  }, [panelMode]);
+
+  const selectedNode = selectedNodeId ? nodeIndex.get(selectedNodeId) : null;
+  const showFullScreen = panelMode === 'entity' && !!selectedNode;
 
   if (!rootId) {
     return (
@@ -36,6 +44,9 @@ export default function App() {
       <FiltersSidebar open={leftOpen} />
       <Workspace workspaceRef={workspaceRef} />
       <DetailsPanel open={rightOpen} onClose={() => setRightOpen(false)} />
+      {showFullScreen && selectedNode && (
+        <FullScreenProfile node={selectedNode} onClose={() => selectNode(null)} />
+      )}
     </div>
   );
 }

@@ -1362,10 +1362,175 @@
 .profile-sections > .profile-section .profile-section-body > .profile-section:last-child {
   margin-bottom: 0;
 }
+.fsp-category-page > .profile-section > .profile-section-header {
+  font-weight: 600;
+}
 .profile-row mark,
 .profile-section-title mark {
   background: #fde68a;
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
+}
+
+/* ─── Perfil em tela cheia (empresa/sócio) — substitui o antigo painel lateral de entidade ── */
+.fsp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.fsp-header {
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  padding: 14px 24px 18px;
+}
+.fsp-back {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0;
+  margin-bottom: 10px;
+}
+.fsp-back:hover {
+  color: var(--ink);
+}
+.fsp-back .icon {
+  width: 16px;
+  height: 16px;
+}
+.fsp-header-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.fsp-identity {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex: 1 1 320px;
+  min-width: 0;
+}
+.fsp-identity h1 {
+  font-size: 19px;
+  margin: 0 0 6px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.fsp-stat-cards {
+  display: flex;
+  gap: 10px;
+  flex: none;
+}
+.fsp-stat-cards .stat {
+  min-width: 130px;
+}
+.fsp-cta {
+  flex: none;
+  white-space: nowrap;
+}
+.fsp-body {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+}
+.fsp-nav {
+  flex: none;
+  width: 272px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fsp-nav button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 11px 12px;
+  font-size: 12.5px;
+  color: var(--muted);
+  text-align: left;
+  width: 100%;
+}
+.fsp-nav button:hover {
+  background: #f9fafb;
+  color: var(--ink);
+}
+.fsp-nav button.active {
+  background: #f3f4f6;
+  color: var(--ink);
+  font-weight: 700;
+}
+.fsp-nav-icon {
+  flex: none;
+  width: 20px;
+  text-align: center;
+  font-size: 14px;
+}
+.fsp-nav-label {
+  flex: 1;
+  white-space: normal;
+  line-height: 1.3;
+}
+.fsp-nav-count {
+  flex: none;
+  font-size: 10px;
+  color: var(--muted);
+  background: #f0f1f3;
+  border-radius: 9px;
+  padding: 2px 7px;
+  min-width: 10px;
+  text-align: center;
+}
+.fsp-nav button.active .fsp-nav-count {
+  background: #e5e7eb;
+  color: var(--ink);
+}
+.fsp-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 28px 60px;
+  min-width: 0;
+}
+.fsp-content .profile-search {
+  max-width: 420px;
+  margin-bottom: 18px;
+}
+.fsp-connections,
+.fsp-history {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+@media (max-width: 860px) {
+  .fsp-body {
+    flex-direction: column;
+  }
+  .fsp-nav {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .fsp-nav button {
+    width: auto;
+  }
+  .fsp-nav-label {
+    white-space: normal;
+  }
 }
