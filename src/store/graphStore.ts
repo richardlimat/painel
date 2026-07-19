@@ -104,6 +104,8 @@ interface GraphState {
   searchFailedCpfs: string[];
   /** rootId calculado assim que a empresa é montada — só vira `rootId` de fato quando o mapa é liberado. */
   searchPendingRootId: string | null;
+  /** true quando há dados no grafo (mapa aberto ou expandido) desde o último "Salvar consulta". */
+  unsavedChanges: boolean;
 
   setProviderMode: (m: ProviderMode) => void;
   setMaxDepth: (d: number) => void;
@@ -135,6 +137,8 @@ interface GraphState {
   updatePersonPhoto: (cpf: string, photoUrl: string | undefined) => void;
   /** Monta o snapshot para "Salvar consulta" — null se não há uma pesquisa aberta (sem rootId). */
   buildSnapshot: () => GraphSnapshot | null;
+  /** Chamado após salvar com sucesso — limpa o aviso de alterações não salvas. */
+  markSaved: () => void;
   /** Restaura grafo + perfis de uma consulta salva — nunca chama FonteData/APIFull. */
   hydrateFromSnapshot: (snapshot: GraphSnapshot, photoUrlsByPersonId: Record<string, string>) => void;
 }
@@ -578,6 +582,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
   searchProfilesFailed: 0,
   searchFailedCpfs: [],
   searchPendingRootId: null,
+  unsavedChanges: false,
 
   setProviderMode: (m) => set({ providerMode: m }),
   setMaxDepth: (d) => set({ maxDepth: d }),
@@ -679,6 +684,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
           currentLayer: 1,
           layerLoading: false,
           searchPhase: 'done',
+          unsavedChanges: true,
         });
       } else {
         // Falha em 1+ CPF não abre o mapa sozinha: fica na tela de decisão até o
@@ -726,6 +732,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         layerLoading: false,
         searchPhase: 'done',
         searchFailedCpfs: [],
+        unsavedChanges: true,
       });
     } else {
       set({ searchFailedCpfs: failed, searchPhase: 'awaiting-decision', loading: false });
@@ -742,6 +749,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       currentLayer: 1,
       layerLoading: false,
       searchPhase: 'done',
+      unsavedChanges: true,
     });
   },
 
@@ -770,6 +778,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       if (!opts?.force && node.depth + 1 > get().currentLayer) {
         set({ currentLayer: node.depth + 1 });
       }
+      set({ unsavedChanges: true });
     } catch (e) {
       set({ error: e instanceof Error ? e.message : 'Erro ao expandir nó' });
     } finally {
@@ -821,6 +830,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         (n) => n.kind === 'person' && !profilesByCpf.has(onlyDigits(n.person?.cpf ?? '')),
       ).length;
       await Promise.all(pending.map((n) => get().expandNode(n.id)));
+      set({ unsavedChanges: true });
     }
     set({ loading: false });
   },
@@ -863,6 +873,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       if (get().graphEpoch !== epoch) return;
       await layerBatch; // aguarda só os perfis descobertos nesta camada, não a fila inteira
       if (get().graphEpoch !== epoch) return;
+      if (frontier.length > 0) set({ unsavedChanges: true });
 
       const hasNext = [...get().nodeIndex.values()].some((n) => n.depth === target);
       if (hasNext) {
@@ -940,7 +951,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       searchProfilesFailed: 0,
       searchFailedCpfs: [],
       searchPendingRootId: null,
+      unsavedChanges: false,
     })),
+
+  markSaved: () => set({ unsavedChanges: false }),
 
   updatePersonPhoto: (cpf, photoUrl) => {
     if (!photoUrl) return;
@@ -1010,6 +1024,8 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       searchPhase: 'done',
       breadcrumb: [snapshot.rootId],
       selectedNodeId: null,
+      // Acabou de vir de uma consulta salva — nada foi alterado ainda.
+      unsavedChanges: false,
     }));
   },
 }));

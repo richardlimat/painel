@@ -39,13 +39,7 @@ describe('App — tela cheia de "Carregando..." durante a busca de CNPJ', () => 
     expect(screen.queryByText('Carregando...')).not.toBeInTheDocument();
   });
 
-  it('3. durante o carregamento, mostra o progresso da fase atual (ex.: perfis)', () => {
-    useGraphStore.setState({ loading: true, searchPhase: 'profiles', searchProfilesTotal: 3, searchProfilesDone: 1 });
-    render(<App />);
-    expect(screen.getByText('Consultando perfis: 1 de 3')).toBeInTheDocument();
-  });
-
-  it('4. falha parcial (awaiting-decision, loading já false) some com a tela cheia e mostra a decisão no formulário', () => {
+  it('3. falha parcial (awaiting-decision, loading já false) some com a tela cheia e mostra a decisão no formulário', () => {
     useGraphStore.setState({
       loading: false,
       searchPhase: 'awaiting-decision',

@@ -14,9 +14,10 @@ export default function App() {
   const rootId = useGraphStore((s) => s.rootId);
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const loading = useGraphStore((s) => s.loading);
-  const reset = useGraphStore((s) => s.reset);
   const authStatus = useAuthStore((s) => s.status);
   const checkSession = useAuthStore((s) => s.checkSession);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [leftOpen, setLeftOpen] = useState(true);
   const [rightOpen, setRightOpen] = useState(false);
@@ -47,14 +48,6 @@ export default function App() {
     );
   }
 
-  const openSavedQueries = () => {
-    if (rootId) {
-      if (!window.confirm('Isso vai descartar o mapa atual (se não foi salvo). Deseja continuar?')) return;
-      reset();
-    }
-    setView('saved');
-  };
-
   if (!rootId) {
     if (loading) {
       return (
@@ -64,12 +57,20 @@ export default function App() {
       );
     }
     return (
-      <div className="h-screen bg-slate-100 dark:bg-slate-950">
-        {view === 'saved' ? (
-          <SavedQueriesList onBack={() => setView('search')} />
-        ) : (
-          <SearchForm onOpenSavedQueries={() => setView('saved')} />
-        )}
+      <div className="flex h-screen flex-col bg-slate-100 dark:bg-slate-950">
+        <div className="flex items-center justify-end gap-3 px-4 py-2 text-sm text-slate-500 dark:text-slate-400">
+          {user?.nome && <span>{user.nome}</span>}
+          <button type="button" onClick={() => void logout()} className="hover:underline">
+            Sair
+          </button>
+        </div>
+        <div className="min-h-0 flex-1">
+          {view === 'saved' ? (
+            <SavedQueriesList onBack={() => setView('search')} />
+          ) : (
+            <SearchForm onOpenSavedQueries={() => setView('saved')} />
+          )}
+        </div>
       </div>
     );
   }
@@ -79,8 +80,8 @@ export default function App() {
       <Topbar
         workspaceRef={workspaceRef}
         onToggleFilters={() => setLeftOpen((v) => !v)}
-        onToggleDetails={() => setRightOpen(true)}
-        onOpenSavedQueries={openSavedQueries}
+        onNavigateToSearch={() => setView('search')}
+        onNavigateToSaved={() => setView('saved')}
       />
       <FiltersSidebar open={leftOpen} />
       <Workspace workspaceRef={workspaceRef} />

@@ -29,8 +29,6 @@ export function FiltersSidebar({ open }: { open: boolean }) {
   const filters = useGraphStore((s) => s.filters);
   const setFilters = useGraphStore((s) => s.setFilters);
   const resetFilters = useGraphStore((s) => s.resetFilters);
-  const maxDepth = useGraphStore((s) => s.maxDepth);
-  const setMaxDepth = useGraphStore((s) => s.setMaxDepth);
   const nodes = useGraphStore((s) => s.nodes);
 
   const ufs = useMemo(
@@ -102,37 +100,6 @@ export function FiltersSidebar({ open }: { open: boolean }) {
         checked={filters.showHeadquarters}
         onChange={(v) => setFilters({ showHeadquarters: v })}
       />
-
-      <div className="rule" />
-      <div className="label-line">
-        <span>Participação mínima</span>
-        <b>{filters.minParticipation > 0 ? `${filters.minParticipation}%` : 'sem filtro'}</b>
-      </div>
-      <input
-        className="range"
-        type="range"
-        min={0}
-        max={100}
-        step={5}
-        value={filters.minParticipation}
-        onChange={(e) => setFilters({ minParticipation: Number(e.target.value) })}
-      />
-
-      <div className="rule" />
-      <div className="label-line">
-        <span>Profundidade</span>
-      </div>
-      <select
-        value={maxDepth === Infinity ? 'inf' : maxDepth}
-        onChange={(e) => setMaxDepth(e.target.value === 'inf' ? Infinity : Number(e.target.value))}
-        aria-label="Limite de níveis de expansão"
-      >
-        <option value={2}>2 níveis</option>
-        <option value={3}>3 níveis</option>
-        <option value={5}>5 níveis</option>
-        <option value={10}>10 níveis</option>
-        <option value="inf">Ilimitado</option>
-      </select>
 
       <div className="rule" />
       <div className="label-line">

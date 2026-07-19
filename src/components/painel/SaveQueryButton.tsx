@@ -1,14 +1,10 @@
 import { useState } from 'react';
 import { useGraphStore } from '../../store/graphStore';
-import { usePersonProfileStore } from '../../store/personProfileStore';
-import { buildImageAssetsForSave } from '../../lib/profileImages';
-import { createSavedQuery } from '../../services/savedQueries';
+import { saveCurrentQuery } from '../../lib/saveQueryAction';
 
 /** Botão "Salvar consulta" — nada é salvo automaticamente, só ao clicar e confirmar. */
 export function SaveQueryButton() {
   const rootId = useGraphStore((s) => s.rootId);
-  const nodes = useGraphStore((s) => s.nodes);
-  const buildSnapshot = useGraphStore((s) => s.buildSnapshot);
   const notify = useGraphStore((s) => s.notify);
 
   const [open, setOpen] = useState(false);
@@ -18,20 +14,9 @@ export function SaveQueryButton() {
   if (!rootId) return null;
 
   const handleSave = async () => {
-    const snapshot = buildSnapshot();
-    if (!snapshot) return;
     setSaving(true);
     try {
-      const profilesByCpf = usePersonProfileStore.getState().profilesByCpf;
-      const images = buildImageAssetsForSave(nodes, profilesByCpf);
-      const rootNode = nodes.find((n) => n.id === rootId);
-      const cnpjRaiz = rootNode?.company?.cnpj ?? '';
-      const result = await createSavedQuery({
-        titulo: titulo.trim() || undefined,
-        cnpjRaiz,
-        snapshot,
-        images,
-      });
+      const result = await saveCurrentQuery(titulo.trim() || undefined);
       notify(
         result.imagesFailed > 0
           ? `Consulta salva. ${result.imagesFailed} imagem(ns) não puderam ser copiadas.`

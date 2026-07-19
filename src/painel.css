@@ -1426,6 +1426,85 @@
   line-height: 1;
   cursor: pointer;
 }
+.btn-back-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--red);
+  background: var(--red);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-right: 12px;
+  flex: none;
+}
+.btn-back-danger:hover {
+  background: #d8323c;
+  border-color: #d8323c;
+}
+.leave-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: grid;
+  place-items: center;
+  z-index: 1000;
+}
+.leave-modal-card {
+  width: min(420px, 90vw);
+  background: var(--panel);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  padding: 24px;
+}
+.leave-modal-card h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.leave-modal-card p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.leave-modal-error {
+  color: var(--red) !important;
+}
+.leave-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.leave-modal-danger {
+  border: 1px solid var(--red);
+  background: #fff;
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.leave-modal-primary {
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.leave-modal-danger:disabled,
+.leave-modal-primary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
 .profile-search {
   display: block;
   margin-bottom: 4px;
