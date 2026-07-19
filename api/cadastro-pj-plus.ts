@@ -1,3 +1,5 @@
+import { requireSession } from './_lib/auth';
+
 export const config = { runtime: 'edge' };
 
 /** Testável isoladamente (ver api/cadastro-pj-plus.test.ts) */
@@ -8,12 +10,16 @@ export function buildFonteDataUrl(cnpj: string): URL {
 }
 
 /**
- * Proxy same-origin para a FonteData (cadastro-pj-plus): evita CORS ao
- * chamar a API a partir do navegador e mantém a chave fora do bundle
- * client-side. Repassa status e corpo do upstream sem reinterpretar —
- * o mapeamento de erros vive em src/services/fontedata.ts.
+ * Proxy same-origin para a FonteData (cadastro-pj-plus), protegido por
+ * sessão (ver api/_lib/auth.ts): evita CORS ao chamar a API a partir do
+ * navegador e mantém a chave fora do bundle client-side. Repassa status e
+ * corpo do upstream sem reinterpretar — o mapeamento de erros vive em
+ * src/services/fontedata.ts.
  */
 export default async function handler(req: Request): Promise<Response> {
+  const auth = await requireSession(req);
+  if (!auth.ok) return auth.response;
+
   const cnpj = new URL(req.url).searchParams.get('CNPJ');
   if (!cnpj || !/^\d{14}$/.test(cnpj)) {
     return new Response(
@@ -31,6 +37,7 @@ export default async function handler(req: Request): Promise<Response> {
   }
 
   const url = buildFonteDataUrl(cnpj);
+  const startedAt = Date.now();
   let upstream: Response;
   try {
     upstream = await fetch(url.toString(), {
@@ -38,7 +45,8 @@ export default async function handler(req: Request): Promise<Response> {
       headers: { 'X-API-Key': apiKey, Accept: 'application/json' },
     });
   } catch {
-    console.log('[fontedata-proxy]', { method: 'GET', url: url.toString(), cnpj, status: 'unreachable' });
+    // Log de diagnóstico — nunca CNPJ, nunca corpo da resposta, nunca a chave.
+    console.log('[fontedata-proxy]', { method: 'GET', status: 'unreachable', durationMs: Date.now() - startedAt });
     return new Response(
       JSON.stringify({ code: 'upstream_unreachable', message: 'Não foi possível conectar à FonteData.' }),
       { status: 502, headers: { 'content-type': 'application/json' } },
@@ -46,14 +54,12 @@ export default async function handler(req: Request): Promise<Response> {
   }
   const body = await upstream.text();
 
-  // Log de diagnóstico (Vercel → Deployments → Functions → Logs) — nunca inclui a chave.
+  // Log de diagnóstico (Vercel → Deployments → Functions → Logs) — nunca CNPJ, corpo ou chave.
   console.log('[fontedata-proxy]', {
     method: 'GET',
-    url: url.toString(),
-    cnpj,
     status: upstream.status,
+    durationMs: Date.now() - startedAt,
     requestId: upstream.headers.get('x-request-id') ?? undefined,
-    body,
   });
 
   return new Response(body, {

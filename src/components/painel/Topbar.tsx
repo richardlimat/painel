@@ -2,31 +2,34 @@ import { useMemo, useState } from 'react';
 import { useGraphStore } from '../../store/graphStore';
 import { normalizeText, onlyDigits } from '../../lib/format';
 import { exportCsv, exportJson, exportPdf, exportPng, exportSvg } from '../../lib/exporters';
+import { saveCurrentQuery } from '../../lib/saveQueryAction';
+import { SaveQueryButton } from './SaveQueryButton';
+import { LeaveConfirmModal } from './LeaveConfirmModal';
 
 interface Props {
   workspaceRef: React.RefObject<HTMLDivElement>;
   onToggleFilters: () => void;
-  onToggleDetails: () => void;
+  onNavigateToSearch: () => void;
+  onNavigateToSaved: () => void;
 }
 
-export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props) {
+export function Topbar({ workspaceRef, onToggleFilters, onNavigateToSearch, onNavigateToSaved }: Props) {
   const nodes = useGraphStore((s) => s.nodes);
   const links = useGraphStore((s) => s.links);
   const searchQuery = useGraphStore((s) => s.searchQuery);
   const setSearchQuery = useGraphStore((s) => s.setSearchQuery);
   const focusNode = useGraphStore((s) => s.focusNode);
   const selectNode = useGraphStore((s) => s.selectNode);
-  const setPanelMode = useGraphStore((s) => s.setPanelMode);
-  const expandAll = useGraphStore((s) => s.expandAll);
   const collapseAll = useGraphStore((s) => s.collapseAll);
   const requestOrganize = useGraphStore((s) => s.requestOrganize);
-  const loading = useGraphStore((s) => s.loading);
   const reset = useGraphStore((s) => s.reset);
   const notify = useGraphStore((s) => s.notify);
+  const unsavedChanges = useGraphStore((s) => s.unsavedChanges);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [leaveTarget, setLeaveTarget] = useState<'search' | 'saved' | null>(null);
 
   const matches = useMemo(() => {
     const q = normalizeText(searchQuery.trim());
@@ -72,8 +75,30 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
     }
   };
 
+  const navigate = (target: 'search' | 'saved') => {
+    reset();
+    if (target === 'saved') onNavigateToSaved();
+    else onNavigateToSearch();
+  };
+
+  const requestLeave = (target: 'search' | 'saved') => {
+    if (unsavedChanges) setLeaveTarget(target);
+    else navigate(target);
+  };
+
   return (
     <header className="topbar">
+      <button
+        type="button"
+        className="btn-back-danger"
+        onClick={() => requestLeave('search')}
+        title="Voltar para a página de consultas"
+      >
+        <svg className="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+        <span>Voltar</span>
+      </button>
       <div className="brand">
         <strong>Painel de Consultas</strong>
         <span>Inteligência Societária</span>
@@ -109,10 +134,6 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
         )}
       </label>
       <div className="actions">
-        <button className="btn plain" onClick={() => void expandAll()} disabled={loading} title="Expandir todos os nós até o limite de níveis">
-          <svg className="icon" viewBox="0 0 24 24"><path d="M9 3H3v6M15 3h6v6M9 21H3v-6M15 21h6v-6" /></svg>
-          <span>{loading ? 'Expandindo…' : 'Expandir Tudo'}</span>
-        </button>
         <button
           className="btn plain"
           onClick={() => {
@@ -132,17 +153,6 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
           <svg className="icon" viewBox="0 0 24 24"><path d="M4 5h16M7 12h10M10 19h4" /></svg>
           <span>Filtros</span>
         </button>
-        <button
-          className="btn plain"
-          onClick={() => {
-            setPanelMode('stats');
-            onToggleDetails();
-          }}
-          title="Estatísticas da rede"
-        >
-          <svg className="icon" viewBox="0 0 24 24"><path d="M5 20V11M11 20V5M17 20v-7M3 20h18" /></svg>
-          <span>Estatísticas</span>
-        </button>
         <div className="export-wrap">
           <button className="btn plain" onClick={() => setExportOpen((v) => !v)} disabled={exporting} title="Exportar grafo">
             <svg className="icon" viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5M4 20h16" /></svg>
@@ -158,17 +168,33 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
             </div>
           )}
         </div>
-        <button className="btn plain" onClick={reset} title="Nova consulta">
+        <button className="btn plain" onClick={() => requestLeave('search')} title="Nova consulta">
           <svg className="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
           <span>Nova consulta</span>
         </button>
-        <div className="avatar">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6b7688" strokeWidth="2">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-          </svg>
-        </div>
+        <SaveQueryButton />
+        <button className="btn plain" onClick={() => requestLeave('saved')} title="Consultas salvas">
+          <svg className="icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" /><path d="M8 4v16M4 9h4" /></svg>
+          <span>Consultas salvas</span>
+        </button>
       </div>
+
+      {leaveTarget && (
+        <LeaveConfirmModal
+          onCancel={() => setLeaveTarget(null)}
+          onLeaveWithoutSaving={() => {
+            const target = leaveTarget;
+            setLeaveTarget(null);
+            navigate(target);
+          }}
+          onSaveAndLeave={async () => {
+            await saveCurrentQuery();
+            const target = leaveTarget;
+            setLeaveTarget(null);
+            navigate(target);
+          }}
+        />
+      )}
     </header>
   );
 }

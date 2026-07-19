@@ -50,6 +50,12 @@ function resetStores() {
     layerLoading: false,
     graphEpoch: 0,
     maxDepth: 5,
+    searchPhase: 'idle',
+    searchProfilesTotal: 0,
+    searchProfilesDone: 0,
+    searchProfilesFailed: 0,
+    searchFailedCpfs: [],
+    searchPendingRootId: null,
   });
   usePersonProfileStore.setState({
     profilesByCpf: new Map(),
@@ -484,5 +490,535 @@ describe('prefetch automático de perfis via APIFull (fila de segundo plano)', (
     // o novo sócio (OUTRO_SOCIO_CPF) descoberto na empresa CNPJ_2 já deve estar
     // pré-carregado, sem qualquer ação extra do usuário.
     expect(usePersonProfileStore.getState().profilesByCpf.has(OUTRO_SOCIO_CPF)).toBe(true);
+  });
+});
+
+describe('startSearch — mapa só abre após o lote da APIFull; sem race condition', () => {
+  const CNPJ_RACE_A = '10000004000191';
+  const CNPJ_RACE_B = '10000005000172';
+
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('1. resposta de uma pesquisa antiga nunca abre nem substitui o mapa da pesquisa atual', async () => {
+    let resolveCompanyA: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes(`CNPJ=${CNPJ_RACE_A}`)) {
+        return new Promise((resolve) => {
+          resolveCompanyA = () => resolve(fonteDataCompany(CNPJ_RACE_A, []));
+        });
+      }
+      if (url.includes(`CNPJ=${CNPJ_RACE_B}`)) {
+        return fonteDataCompany(CNPJ_RACE_B, []);
+      }
+      if (url.includes('/api/cpf-ultra')) return apiFullSuccess([]);
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    const searchA = useGraphStore.getState().startSearch(CNPJ_RACE_A);
+    await Promise.resolve(); // A começa (fetch da FonteData pendente)
+
+    await useGraphStore.getState().startSearch(CNPJ_RACE_B); // B conclui por completo primeiro
+    expect(useGraphStore.getState().rootId).toBe(companyId(CNPJ_RACE_B));
+
+    resolveCompanyA?.(); // A finalmente responde, tarde demais
+    await searchA;
+
+    // A não pode ter reaberto nem substituído o mapa de B
+    expect(useGraphStore.getState().rootId).toBe(companyId(CNPJ_RACE_B));
+  });
+
+  it('2. mapa (rootId) permanece oculto enquanto o lote de perfis da APIFull não termina', async () => {
+    let resolveProfile: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        return new Promise((resolve) => {
+          resolveProfile = () => resolve(apiFullSuccess([]));
+        });
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    const promise = useGraphStore.getState().startSearch(NEW_CNPJ);
+    await vi.waitFor(() => {
+      if (useGraphStore.getState().searchPhase !== 'profiles') throw new Error('ainda não chegou em profiles');
+    });
+    expect(useGraphStore.getState().rootId).toBeNull();
+    expect(useGraphStore.getState().loading).toBe(true);
+
+    resolveProfile?.();
+    await promise;
+    expect(useGraphStore.getState().rootId).toBe(companyId(NEW_CNPJ));
+    expect(useGraphStore.getState().searchPhase).toBe('done');
+  });
+
+  it('3. falha em CPF do lote inicial não abre o mapa — fica em awaiting-decision, mas não interrompe os demais', async () => {
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/cpf-ultra')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
+        if (body.cpf === PERSON_CPF) return jsonResponse({ message: 'erro' }, 500);
+        return apiFullSuccess([]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [
+          { nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF },
+          { nome: 'OUTRO SOCIO', cargo: 'Sócio', documento: OUTRO_SOCIO_CPF },
+        ]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startSearch(NEW_CNPJ);
+
+    expect(useGraphStore.getState().rootId).toBeNull();
+    expect(useGraphStore.getState().searchPhase).toBe('awaiting-decision');
+    expect(useGraphStore.getState().searchFailedCpfs).toEqual([PERSON_CPF]);
+    // o sócio que não falhou já foi carregado normalmente (falha de 1 não trava os demais)
+    expect(usePersonProfileStore.getState().profilesByCpf.has(OUTRO_SOCIO_CPF)).toBe(true);
+  });
+
+  it('4. continueWithAvailableData libera o mapa mesmo com falhas pendentes', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) return jsonResponse({ message: 'erro' }, 500);
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startSearch(NEW_CNPJ);
+    expect(useGraphStore.getState().rootId).toBeNull();
+
+    useGraphStore.getState().continueWithAvailableData();
+    expect(useGraphStore.getState().rootId).toBe(companyId(NEW_CNPJ));
+    expect(useGraphStore.getState().searchPhase).toBe('done');
+  });
+
+  it('5. retryFailedSearchProfiles reprocessa só os CPFs que falharam e libera o mapa quando todos passam', async () => {
+    let apifullCalls = 0;
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        apifullCalls += 1;
+        if (apifullCalls === 1) return jsonResponse({ message: 'erro' }, 500);
+        return apiFullSuccess([]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startSearch(NEW_CNPJ);
+    expect(useGraphStore.getState().searchPhase).toBe('awaiting-decision');
+
+    await useGraphStore.getState().retryFailedSearchProfiles();
+    expect(useGraphStore.getState().rootId).toBe(companyId(NEW_CNPJ));
+    expect(useGraphStore.getState().searchPhase).toBe('done');
+    expect(useGraphStore.getState().searchFailedCpfs).toEqual([]);
+    expect(apifullCalls).toBe(2); // 1ª falhou, 2ª (retry) passou — nunca reconsultou o que já tinha dado certo
+  });
+});
+
+describe('startPersonSearch — Consulta Avançada (busca por CPF)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('1. CPF sem sociedades abre o mapa só com o nó pessoa (label = CPF formatado)', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) return apiFullSuccess([]);
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    expect(state.rootId).toBe(personId(PERSON_CPF));
+    expect(state.searchPhase).toBe('done');
+    expect(state.loading).toBe(false);
+    expect(state.nodes).toHaveLength(1);
+    expect(state.nodeIndex.get(personId(PERSON_CPF))?.label).toBe('111.444.777-35');
+    expect(state.nodeIndex.get(personId(PERSON_CPF))?.expanded).toBe(true);
+  });
+
+  it('2. CPF com sociedades cria os nós placeholder, enriquece via FonteData e abre o mapa', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        return apiFullSuccess([
+          {
+            cnpj: NEW_CNPJ,
+            razao_social: 'EMPRESA NOVA LTDA',
+            situacao_cadastral: 'ATIVA',
+            qualificacao_socio_descricao: 'Sócio',
+            dt_entrada: '10/05/2024',
+            nome_socio: 'FULANO DE TAL',
+            documento_socio: PERSON_CPF,
+          },
+        ]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    const rootId = personId(PERSON_CPF);
+    expect(state.rootId).toBe(rootId);
+    expect(state.nodeIndex.get(rootId)?.label).toBe('FULANO DE TAL');
+    expect(state.nodeIndex.get(rootId)?.expanded).toBe(true);
+    const company = state.nodeIndex.get(companyId(NEW_CNPJ));
+    expect(company?.depth).toBe(1);
+    expect(company?.company?.razaoSocial).toBe(`EMPRESA ${NEW_CNPJ} LTDA`);
+    expect(state.searchPhase).toBe('done');
+  });
+
+  it('3. falha ao buscar o perfil do CPF raiz não abre o mapa', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) return jsonResponse({ message: 'erro' }, 500);
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    expect(state.rootId).toBeNull();
+    expect(state.searchPhase).toBe('error');
+    expect(state.error).toBeTruthy();
+  });
+
+  it('4. falha parcial no enriquecimento de uma sociedade ainda assim abre o mapa, com a pessoa não-expandida', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        return apiFullSuccess([
+          {
+            cnpj: NEW_CNPJ,
+            qualificacao_socio_descricao: 'Sócio',
+            documento_socio: PERSON_CPF,
+            nome_socio: 'FULANO DE TAL',
+          },
+          {
+            cnpj: FAILING_CNPJ,
+            qualificacao_socio_descricao: 'Sócio',
+            documento_socio: PERSON_CPF,
+            nome_socio: 'FULANO DE TAL',
+          },
+        ]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      if (url.includes(`CNPJ=${FAILING_CNPJ}`)) {
+        return jsonResponse({ code: 'invalid_parameters', message: 'erro simulado' }, 400);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    const rootId = personId(PERSON_CPF);
+    expect(state.rootId).toBe(rootId); // falha parcial não bloqueia a abertura do mapa
+    expect(state.nodeIndex.get(rootId)?.expanded).toBe(false); // permite tentar de novo
+    expect(state.notice).toMatch(/parcial/i);
+  });
+
+  it('5. busca por CPF antiga nunca abre nem substitui o mapa da busca atual', async () => {
+    // A tem uma sociedade cujo enriquecimento na FonteData fica pendente (controlável);
+    // B é uma busca completamente nova, sem sociedades, que conclui primeiro. O próprio
+    // perfil da APIFull (que passa pela fila serial única do personProfileStore) resolve
+    // na hora para as duas — a "corrida" real acontece no enriquecimento via FonteData,
+    // que não passa por essa fila (mesmo padrão do teste equivalente de startSearch).
+    let resolveCompanyA: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/cpf-ultra')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
+        if (body.cpf === PERSON_CPF) {
+          return apiFullSuccess([
+            { cnpj: NEW_CNPJ, qualificacao_socio_descricao: 'Sócio', documento_socio: PERSON_CPF, nome_socio: 'FULANO DE TAL' },
+          ]);
+        }
+        return apiFullSuccess([]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return new Promise((resolve) => {
+          resolveCompanyA = () => resolve(fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]));
+        });
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    const searchA = useGraphStore.getState().startPersonSearch(PERSON_CPF);
+    await vi.waitFor(() => {
+      if (!resolveCompanyA) throw new Error('ainda não chegou no enriquecimento via FonteData');
+    });
+
+    await useGraphStore.getState().startPersonSearch(OUTRO_SOCIO_CPF); // B conclui primeiro
+    expect(useGraphStore.getState().rootId).toBe(personId(OUTRO_SOCIO_CPF));
+
+    resolveCompanyA?.(); // A finalmente responde, tarde demais
+    await searchA;
+
+    expect(useGraphStore.getState().rootId).toBe(personId(OUTRO_SOCIO_CPF));
+  });
+});
+
+describe('foto da pessoa — atualiza o nó automaticamente quando o perfil resolve', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('1. perfil resolvido durante a expansão da pessoa atualiza photoUrl do nó', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        return jsonResponse({
+          status: 'sucesso',
+          dados: { SERVICE_RESPONSE: { cadastral: { foto: 'https://cdn.example.com/foto.jpg' }, sociedades: [] } },
+        });
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    const person = putPersonNode(0);
+    await useGraphStore.getState().expandNode(person.id, { force: true });
+
+    expect(useGraphStore.getState().nodeIndex.get(person.id)?.person?.photoUrl).toBe('https://cdn.example.com/foto.jpg');
+  });
+
+  it('2. perfil resolvido tardiamente (ex.: usuário abre o painel depois do mapa montado) também atualiza o nó', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        return jsonResponse({
+          status: 'sucesso',
+          dados: { SERVICE_RESPONSE: { fotos: ['https://cdn.example.com/tardia.jpg'] } },
+        });
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    const person = putPersonNode(0);
+    expect(useGraphStore.getState().nodeIndex.get(person.id)?.person?.photoUrl).toBeUndefined();
+
+    // simula o clique no painel de perfil, independente de qualquer expansão de camada
+    await usePersonProfileStore.getState().loadProfile(person.person!.cpf);
+
+    expect(useGraphStore.getState().nodeIndex.get(person.id)?.person?.photoUrl).toBe('https://cdn.example.com/tardia.jpg');
+  });
+
+  it('3. updatePersonPhoto não faz nada sem URL ou sem nó correspondente no grafo', () => {
+    useGraphStore.getState().updatePersonPhoto(PERSON_CPF, undefined);
+    expect(useGraphStore.getState().nodeIndex.has(personId(PERSON_CPF))).toBe(false);
+    useGraphStore.getState().updatePersonPhoto('00000000000', 'https://cdn.example.com/x.jpg');
+    expect(useGraphStore.getState().nodeIndex.has(personId('00000000000'))).toBe(false);
+  });
+});
+
+describe('buildSnapshot / hydrateFromSnapshot — salvar e reabrir consulta sem chamar as APIs', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('1. buildSnapshot retorna null sem pesquisa aberta (sem rootId)', () => {
+    expect(useGraphStore.getState().buildSnapshot()).toBeNull();
+  });
+
+  it('2. buildSnapshot inclui grafo + perfis sanitizados, mas nunca photoUrl cru nem campos hard', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        return jsonResponse({
+          status: 'sucesso',
+          dados: {
+            SERVICE_RESPONSE: {
+              cadastral: { foto: 'https://cdn.example.com/foto.jpg' },
+              credenciaisVazadas: [{ senha: 'segredo123' }],
+            },
+          },
+        });
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startSearch(NEW_CNPJ);
+    const snapshot = useGraphStore.getState().buildSnapshot();
+
+    expect(snapshot).not.toBeNull();
+    expect(snapshot!.rootId).toBe(companyId(NEW_CNPJ));
+    expect(snapshot!.nodes.length).toBeGreaterThan(0);
+    const personNode = snapshot!.nodes.find((n) => n.id === personId(PERSON_CPF));
+    expect(personNode?.person?.photoUrl).toBeUndefined(); // nunca persiste photoUrl cru
+    expect(snapshot!.profiles[PERSON_CPF]).toBeDefined();
+    expect(JSON.stringify(snapshot!.profiles[PERSON_CPF])).not.toContain('segredo123'); // campo hard removido
+  });
+
+  it('3. hydrateFromSnapshot restaura o grafo e os perfis sem chamar FonteData/APIFull', () => {
+    const snapshot = {
+      rootId: companyId(NEW_CNPJ),
+      nodes: [
+        { id: companyId(NEW_CNPJ), kind: 'company' as const, label: 'EMPRESA X', depth: 0, expanded: true, company: { cnpj: NEW_CNPJ, razaoSocial: 'EMPRESA X', situacao: 'ATIVA' as const } },
+        { id: personId(PERSON_CPF), kind: 'person' as const, label: 'FULANO', depth: 1, expanded: false, person: { cpf: PERSON_CPF, nome: 'FULANO' } },
+      ],
+      links: [],
+      currentLayer: 1,
+      maxDepth: 5,
+      filters: useGraphStore.getState().filters,
+      profiles: { [PERSON_CPF]: { SERVICE_RESPONSE: { cadastral: { nome: 'FULANO' } } } },
+    };
+
+    useGraphStore.getState().hydrateFromSnapshot(snapshot, { [personId(PERSON_CPF)]: 'https://supabase.example.com/signed/foto.jpg' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(useGraphStore.getState().rootId).toBe(companyId(NEW_CNPJ));
+    expect(useGraphStore.getState().nodeIndex.get(personId(PERSON_CPF))?.person?.photoUrl).toBe(
+      'https://supabase.example.com/signed/foto.jpg',
+    );
+    expect(usePersonProfileStore.getState().profilesByCpf.get(PERSON_CPF)).toEqual(snapshot.profiles[PERSON_CPF]);
+  });
+});
+
+describe('nextLayer — aguarda só o lote de CPFs da própria camada (não a fila inteira)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('1. layerLoading permanece true até o sócio de uma empresa descoberta em cascata terminar (não só a fronteira original)', async () => {
+    let resolveCascadeProfile: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/cpf-ultra')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
+        if (body.cpf === PERSON_CPF) {
+          return apiFullSuccess([
+            { cnpj: NEW_CNPJ, qualificacao_socio_descricao: 'Sócio', documento_socio: PERSON_CPF, nome_socio: 'FULANO' },
+          ]);
+        }
+        if (body.cpf === OUTRO_SOCIO_CPF) {
+          return new Promise((resolve) => {
+            resolveCascadeProfile = () => resolve(apiFullSuccess([]));
+          });
+        }
+        return apiFullSuccess([]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [
+          { nome: 'FULANO', cargo: 'Sócio', documento: PERSON_CPF },
+          { nome: 'OUTRO', cargo: 'Sócio', documento: OUTRO_SOCIO_CPF },
+        ]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    useGraphStore.setState({ rootId: 'fake-root', currentLayer: 1 });
+    putPersonNode(0);
+
+    const promise = useGraphStore.getState().nextLayer();
+    expect(useGraphStore.getState().layerLoading).toBe(true);
+
+    await vi.waitFor(() => {
+      if (!resolveCascadeProfile) throw new Error('perfil do sócio em cascata ainda não começou');
+    });
+    // a empresa nova (e o link pessoa→empresa) já está no grafo, mas o perfil do
+    // sócio descoberto nela ainda está pendente — layerLoading não pode ter caído.
+    expect(useGraphStore.getState().layerLoading).toBe(true);
+    expect(useGraphStore.getState().nodeIndex.has(companyId(NEW_CNPJ))).toBe(true);
+
+    resolveCascadeProfile?.();
+    await promise;
+    expect(useGraphStore.getState().layerLoading).toBe(false);
+    expect(usePersonProfileStore.getState().profilesByCpf.has(OUTRO_SOCIO_CPF)).toBe(true);
+  });
+
+  it('2. nextLayer resolve assim que o lote da própria camada termina, sem esperar itens alheios travados na fila global', async () => {
+    const UNRELATED_CPF = '39053344705';
+    let resolveCascadeProfile: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/cpf-ultra')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
+        if (body.cpf === PERSON_CPF) {
+          return apiFullSuccess([
+            { cnpj: NEW_CNPJ, qualificacao_socio_descricao: 'Sócio', documento_socio: PERSON_CPF, nome_socio: 'FULANO' },
+          ]);
+        }
+        if (body.cpf === OUTRO_SOCIO_CPF) {
+          return new Promise((resolve) => {
+            resolveCascadeProfile = () => resolve(apiFullSuccess([]));
+          });
+        }
+        if (body.cpf === UNRELATED_CPF) {
+          return new Promise(() => {}); // nunca resolve — item alheio a esta camada
+        }
+        return apiFullSuccess([]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [
+          { nome: 'FULANO', cargo: 'Sócio', documento: PERSON_CPF },
+          { nome: 'OUTRO', cargo: 'Sócio', documento: OUTRO_SOCIO_CPF },
+        ]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    useGraphStore.setState({ rootId: 'fake-root', currentLayer: 1 });
+    putPersonNode(0);
+
+    const promise = useGraphStore.getState().nextLayer();
+    await vi.waitFor(() => {
+      if (!resolveCascadeProfile) throw new Error('perfil do sócio em cascata ainda não começou');
+    });
+    resolveCascadeProfile?.();
+    // Enquanto a resolução acima ainda está em voo (microtask), uma operação
+    // totalmente alheia a esta camada enfileira um CPF que nunca termina —
+    // isso não pode fazer nextLayer travar esperando por ele.
+    usePersonProfileStore.getState().prefetchProfiles([UNRELATED_CPF]);
+
+    await promise;
+    expect(useGraphStore.getState().layerLoading).toBe(false);
   });
 });

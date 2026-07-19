@@ -5,8 +5,35 @@ import {
   formatApproxSize,
   guessMimeType,
   isLikelyDocumentBlob,
+  isLikelyImageUrl,
   truncateItems,
 } from './profileRender';
+
+describe('isLikelyImageUrl', () => {
+  it('1. aceita URL http(s) com extensão de imagem, independente da chave', () => {
+    expect(isLikelyImageUrl('qualquerCampo', 'https://cdn.example.com/x.jpg')).toBe(true);
+    expect(isLikelyImageUrl('qualquerCampo', 'https://cdn.example.com/x.png?v=2')).toBe(true);
+  });
+
+  it('2. aceita URL http(s) sem extensão quando a chave sugere foto/imagem', () => {
+    expect(isLikelyImageUrl('fotoPerfil', 'https://cdn.example.com/blob/abc123')).toBe(true);
+  });
+
+  it('3. rejeita URL sem extensão de imagem e sem chave sugestiva', () => {
+    expect(isLikelyImageUrl('linkDocumento', 'https://cdn.example.com/blob/abc123')).toBe(false);
+  });
+
+  it('4. rejeita esquemas inseguros mesmo com chave/extensão de imagem', () => {
+    expect(isLikelyImageUrl('foto', 'javascript:alert(1)')).toBe(false);
+    expect(isLikelyImageUrl('foto', 'data:image/png;base64,AAAA')).toBe(false);
+    expect(isLikelyImageUrl('foto', 'file:///etc/x.jpg')).toBe(false);
+  });
+
+  it('5. ignora valores que não são string', () => {
+    expect(isLikelyImageUrl('foto', 12345)).toBe(false);
+    expect(isLikelyImageUrl('foto', null)).toBe(false);
+  });
+});
 
 describe('isLikelyDocumentBlob', () => {
   it('trata string muito longa (>2000) como documento, independente da chave', () => {

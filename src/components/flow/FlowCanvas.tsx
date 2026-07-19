@@ -91,6 +91,7 @@ function FlowCanvasInner() {
           subLabel: n.company?.nomeFantasia,
           idLabel: n.kind === 'company' ? formatCNPJ(n.company?.cnpj ?? '') : n.person?.cpf,
           role: n.kind === 'person' && n.person?.administrador ? 'Administrador' : undefined,
+          photoUrl: n.person?.photoUrl,
           main: isRoot,
           expanded: n.expanded,
           expanding: expandingIds.has(n.id),

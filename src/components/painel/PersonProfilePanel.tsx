@@ -8,11 +8,13 @@ import {
   formatApproxSize,
   formatScalarValue,
   isLikelyDocumentBlob,
+  isLikelyImageUrl,
   truncateItems,
 } from '../../lib/profileRender';
 import { groupServiceResponse, type ProfileCategoryGroup } from '../../lib/profileCategories';
 import { normalizeText } from '../../lib/format';
 import { CollapsibleSection } from './CollapsibleSection';
+import { ImageLightbox } from './ImageLightbox';
 
 function countRecords(value: unknown): number | undefined {
   if (Array.isArray(value)) return value.length;
@@ -61,9 +63,11 @@ function entryMatchesQuery(key: string, value: unknown, query: string): boolean 
  * Base64/documento grande: nunca renderizado como texto cru. Só decodifica
  * e cria um Blob URL quando o usuário clica em "Visualizar" — o URL é
  * revogado ao trocar de documento ou desmontar o painel, nunca persiste em
- * localStorage/sessionStorage.
+ * localStorage/sessionStorage. Se o conteúdo decodificado for uma imagem,
+ * abre no lightbox (miniatura ampliada); caso contrário (PDF etc.), abre em
+ * nova aba como antes.
  */
-function DocumentValue({ base64 }: { base64: string }) {
+function DocumentValue({ base64, onOpenImage }: { base64: string; onOpenImage: (url: string) => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -79,17 +83,35 @@ function DocumentValue({ base64 }: { base64: string }) {
         type="button"
         className="btn plain"
         onClick={() => {
-          const url = URL.createObjectURL(decodeBase64ToBlob(base64));
+          const blob = decodeBase64ToBlob(base64);
+          const url = URL.createObjectURL(blob);
           setPreviewUrl((prev) => {
             if (prev) URL.revokeObjectURL(prev);
             return url;
           });
-          window.open(url, '_blank', 'noopener,noreferrer');
+          if (blob.type.startsWith('image/')) {
+            onOpenImage(url);
+          } else {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
         }}
       >
         Visualizar
       </button>
     </span>
+  );
+}
+
+/** URL http(s) de imagem: miniatura clicável (lazy, fallback de erro), nunca texto cru. */
+function ImageUrlValue({ url, alt, onOpen }: { url: string; alt: string; onOpen: (url: string) => void }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return <span className="profile-row-value">Imagem indisponível</span>;
+  }
+  return (
+    <button type="button" className="profile-image-thumb" onClick={() => onOpen(url)} aria-label={`Ampliar imagem: ${alt}`}>
+      <img src={url} alt="" loading="lazy" onError={() => setFailed(true)} />
+    </button>
   );
 }
 
@@ -119,12 +141,14 @@ function RenderValue({
   value,
   depth,
   query,
+  onOpenImage,
 }: {
   label: string;
   keyName: string;
   value: unknown;
   depth: number;
   query: string;
+  onOpenImage: (url: string) => void;
 }) {
   if (depth > MAX_RENDER_DEPTH) {
     return (
@@ -135,11 +159,20 @@ function RenderValue({
     );
   }
 
+  if (typeof value === 'string' && isLikelyImageUrl(keyName, value)) {
+    return (
+      <div className="profile-row">
+        <span>{highlightMatch(label, query)}</span>
+        <ImageUrlValue url={value} alt={label} onOpen={onOpenImage} />
+      </div>
+    );
+  }
+
   if (typeof value === 'string' && isLikelyDocumentBlob(keyName, value)) {
     return (
       <div className="profile-row">
         <span>{highlightMatch(label, query)}</span>
-        <DocumentValue base64={value} />
+        <DocumentValue base64={value} onOpenImage={onOpenImage} />
       </div>
     );
   }
@@ -168,7 +201,14 @@ function RenderValue({
       <div className="profile-array">
         {visible.map((item, i) => (
           <div className="profile-array-item" key={i}>
-            <RenderValue label={`#${i + 1}`} keyName={keyName} value={item} depth={depth + 1} query={query} />
+            <RenderValue
+              label={`#${i + 1}`}
+              keyName={keyName}
+              value={item}
+              depth={depth + 1}
+              query={query}
+              onOpenImage={onOpenImage}
+            />
           </div>
         ))}
         {hiddenCount > 0 && <p className="profile-more">+{hiddenCount} mais</p>}
@@ -189,7 +229,7 @@ function RenderValue({
     return (
       <div className="profile-object">
         {entries.map(([k, v]) => (
-          <RenderValue key={k} label={k} keyName={k} value={v} depth={depth + 1} query={query} />
+          <RenderValue key={k} label={k} keyName={k} value={v} depth={depth + 1} query={query} onOpenImage={onOpenImage} />
         ))}
       </div>
     );
@@ -203,7 +243,15 @@ function RenderValue({
   );
 }
 
-function CategorySection({ group, query }: { group: ProfileCategoryGroup; query: string }) {
+function CategorySection({
+  group,
+  query,
+  onOpenImage,
+}: {
+  group: ProfileCategoryGroup;
+  query: string;
+  onOpenImage: (url: string) => void;
+}) {
   return (
     <CollapsibleSection
       title={highlightMatch(group.name, query)}
@@ -215,7 +263,7 @@ function CategorySection({ group, query }: { group: ProfileCategoryGroup; query:
       ) : (
         group.entries.map(([key, value]) => (
           <CollapsibleSection key={key} title={highlightMatch(key, query)} count={countRecords(value)} forceOpen={!!query}>
-            <RenderValue label={key} keyName={key} value={value} depth={0} query={query} />
+            <RenderValue label={key} keyName={key} value={value} depth={0} query={query} onOpenImage={onOpenImage} />
           </CollapsibleSection>
         ))
       )}
@@ -239,10 +287,12 @@ export function PersonProfilePanel({ node }: { node: GraphNode }) {
   const error = usePersonProfileStore((s) => s.errorsByCpf.get(cpf));
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (cpf) void loadProfile(cpf);
     setSearchQuery('');
+    setLightboxSrc(null);
   }, [cpf, loadProfile]);
 
   const query = normalizeText(searchQuery.trim());
@@ -289,10 +339,11 @@ export function PersonProfilePanel({ node }: { node: GraphNode }) {
           </label>
           {query && categoryGroups.length === 0 && <p className="profile-status">Nenhum registro encontrado.</p>}
           {categoryGroups.map((group) => (
-            <CategorySection key={group.name} group={group} query={searchQuery.trim()} />
+            <CategorySection key={group.name} group={group} query={searchQuery.trim()} onOpenImage={setLightboxSrc} />
           ))}
         </div>
       )}
+      {lightboxSrc && <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />}
     </div>
   );
 }
