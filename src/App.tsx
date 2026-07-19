@@ -8,11 +8,10 @@ import { SavedQueriesList } from './components/SavedQueriesList';
 import { Topbar } from './components/painel/Topbar';
 import { FiltersSidebar } from './components/painel/FiltersSidebar';
 import { Workspace } from './components/painel/Workspace';
-import { DetailsPanel } from './components/painel/DetailsPanel';
+import { EntityDetail } from './components/painel/EntityDetail';
 
 export default function App() {
   const rootId = useGraphStore((s) => s.rootId);
-  const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
   const loading = useGraphStore((s) => s.loading);
   const authStatus = useAuthStore((s) => s.status);
   const checkSession = useAuthStore((s) => s.checkSession);
@@ -20,17 +19,11 @@ export default function App() {
   const logout = useAuthStore((s) => s.logout);
   const workspaceRef = useRef<HTMLDivElement>(null);
   const [leftOpen, setLeftOpen] = useState(true);
-  const [rightOpen, setRightOpen] = useState(false);
   const [view, setView] = useState<'search' | 'saved'>('search');
 
   useEffect(() => {
     void checkSession();
   }, [checkSession]);
-
-  // selecionar um nó abre o painel de detalhes automaticamente
-  useEffect(() => {
-    if (selectedNodeId) setRightOpen(true);
-  }, [selectedNodeId]);
 
   if (authStatus === 'checking') {
     return (
@@ -77,7 +70,7 @@ export default function App() {
   }
 
   return (
-    <div className={`painel app ${leftOpen ? '' : 'left-collapsed'} ${rightOpen ? '' : 'right-collapsed'}`}>
+    <div className={`painel app right-collapsed ${leftOpen ? '' : 'left-collapsed'}`}>
       <Topbar
         workspaceRef={workspaceRef}
         onToggleFilters={() => setLeftOpen((v) => !v)}
@@ -86,7 +79,7 @@ export default function App() {
       />
       <FiltersSidebar open={leftOpen} />
       <Workspace workspaceRef={workspaceRef} />
-      <DetailsPanel open={rightOpen} onClose={() => setRightOpen(false)} />
+      <EntityDetail />
     </div>
   );
 }

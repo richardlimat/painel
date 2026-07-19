@@ -1436,6 +1436,11 @@
   font-size: 10px;
   text-decoration: underline;
   padding: 0;
+  white-space: nowrap;
+  flex: none;
+}
+.profile-masked {
+  flex-wrap: wrap;
 }
 .profile-image-thumb {
   border: 1px solid var(--line);
@@ -1594,4 +1599,462 @@
   color: inherit;
   border-radius: 2px;
   padding: 0 1px;
+}
+
+/* ─── Detalhe da entidade em TELA CHEIA (pessoa em abas, empresa em página única) ─── */
+.entity-full {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #f5f6f8;
+  color: var(--ink);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.entity-full-topbar {
+  flex: none;
+  height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(16px, 4vw, 40px);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+}
+.entity-full-kind {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.entity-full-close {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: #374151;
+  border-radius: 8px;
+  padding: 8px 13px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.entity-full-close:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+.entity-full-close svg {
+  flex: none;
+}
+
+/* Barra de abas (pessoa) — logo abaixo da topbar, rolagem horizontal se faltar espaço */
+.ef-nav {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  align-items: stretch;
+  padding: 0 clamp(16px, 4vw, 40px);
+  background: var(--panel);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.ef-tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+  padding: 14px 14px 12px;
+  border-bottom: 2px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.ef-tab:hover:not(:disabled) {
+  color: #374151;
+}
+.ef-tab:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ef-tab.active {
+  color: var(--blue);
+  border-bottom-color: var(--blue);
+}
+.ef-tab-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: #eef0f3;
+  border-radius: 999px;
+  padding: 1px 7px;
+  min-width: 18px;
+  text-align: center;
+}
+.ef-tab.active .ef-tab-count {
+  color: var(--blue);
+  background: #e6efff;
+}
+
+/* Corpo rolável */
+.ef-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: clamp(18px, 3vw, 32px) clamp(16px, 4vw, 40px) 72px;
+}
+.ef-body > * {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+/* Cabeçalho da entidade */
+.ef-hero {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px 24px;
+  box-shadow: var(--shadow);
+  margin-bottom: 26px;
+}
+.ef-hero-avatar {
+  width: 74px;
+  height: 74px;
+  flex: none;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  overflow: hidden;
+}
+.ef-hero-avatar.company {
+  background: linear-gradient(135deg, #1e293b, #334155);
+}
+.ef-hero-avatar.person {
+  background: linear-gradient(135deg, #1671f9, #4f46e5);
+}
+.ef-hero-avatar-icon {
+  width: 40px;
+  height: 40px;
+  color: #fff;
+  fill: none;
+  stroke: #fff;
+}
+.ef-hero-photo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ef-hero-info {
+  min-width: 0;
+  flex: 1;
+}
+.ef-hero-name {
+  font-size: clamp(20px, 2.4vw, 28px);
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  line-height: 1.15;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.ef-status {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #047857;
+  background: #ecfdf3;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 3px 10px;
+}
+.ef-status.bad {
+  color: #b42318;
+  background: #fef3f2;
+  border-color: #fecaca;
+}
+.ef-status.off {
+  color: #b54708;
+  background: #fffaeb;
+  border-color: #fde68a;
+}
+.ef-hero-badges {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+}
+.ef-badge {
+  font-size: 12px;
+  font-weight: 650;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 4px 10px;
+}
+.ef-badge.mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.5px;
+}
+.ef-hero-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.ef-search {
+  flex: none;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(280px, 34vw);
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  padding: 0 12px;
+  background: #fff;
+  color: var(--muted);
+}
+.ef-search input {
+  border: 0;
+  outline: 0;
+  width: 100%;
+  background: transparent;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+/* Seções e grade de cartões */
+.ef-section {
+  margin-bottom: 30px;
+}
+.ef-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #374151;
+  padding-bottom: 12px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+.ef-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  background: #eef0f3;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.ef-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 14px;
+}
+.ef-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 14px 16px;
+  min-width: 0;
+}
+.ef-card-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+.ef-card-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.ef-card-value .profile-row-value {
+  text-align: left;
+}
+
+/* Sub-seções (objetos/arrays aninhados) */
+.ef-group {
+  margin-top: 18px;
+  padding: 16px 18px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.ef-group-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0 0 14px;
+}
+.ef-group .ef-group {
+  background: #f9fafb;
+}
+.ef-records {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.ef-record {
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: #fbfbfc;
+}
+.ef-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ef-chip {
+  font-size: 12.5px;
+  color: #374151;
+  background: #f3f4f6;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 6px 11px;
+}
+.ef-empty {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+/* Mensagens de status (pessoa) */
+.ef-status-msg {
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+.ef-status-error {
+  color: #b42318;
+}
+
+/* Indicadores rápidos (empresa) */
+.ef-stat-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.ef-stat {
+  flex: 1 1 160px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 14px 16px;
+  background: var(--panel);
+}
+.ef-stat b {
+  display: block;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+}
+.ef-stat small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Conexões clicáveis */
+.ef-connections {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.ef-connection {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  padding: 11px 13px;
+  color: var(--ink);
+  min-width: 0;
+}
+.ef-connection:hover {
+  border-color: var(--blue);
+  background: #f5f9ff;
+}
+.ef-connection-icon {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+}
+.ef-connection-icon.company {
+  background: #334155;
+}
+.ef-connection-icon.person {
+  background: #1671f9;
+}
+.ef-connection-icon .tiny-company-icon {
+  width: 20px;
+  height: 20px;
+  stroke: #fff;
+}
+.ef-connection-body {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ef-connection-body strong {
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ef-connection-body small {
+  font-size: 11px;
+  color: var(--muted);
+}
+.ef-connection-tag {
+  flex: none;
+  font-size: 10px;
+  font-weight: 650;
+  color: #374151;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+@media (max-width: 640px) {
+  .ef-hero {
+    flex-wrap: wrap;
+  }
+  .ef-search {
+    order: 3;
+    width: 100%;
+  }
 }
