@@ -1,8 +1,78 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useGraphStore } from '../../store/graphStore';
 import { LINK_COLORS, NODE_LEGEND, RELATION_LABELS } from '../../lib/colors';
 import { CompanyIcon, PersonIcon } from '../flow/icons';
+import { normalizeText } from '../../lib/format';
 import type { RelationType } from '../../types/graph';
+
+/** Busca de CNAE por código ou descrição, digitando — em vez de rolar um &lt;select&gt; longo. */
+function CnaeSearch({
+  cnaes,
+  value,
+  onChange,
+}: {
+  cnaes: [string, string][];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const selected = cnaes.find(([cod]) => cod === value);
+
+  const matches = useMemo(() => {
+    const q = normalizeText(query.trim());
+    if (!q) return cnaes;
+    return cnaes.filter(([cod, desc]) => normalizeText(desc).includes(q) || cod.includes(q));
+  }, [cnaes, query]);
+
+  return (
+    <div className="cnae-search">
+      <input
+        type="text"
+        value={query}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setOpen(true);
+          if (value) onChange('');
+        }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder={selected ? `${selected[0]} — ${selected[1]}` : 'Buscar por código ou descrição...'}
+        aria-label="Buscar CNAE"
+      />
+      {value && (
+        <button
+          type="button"
+          className="cnae-clear"
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            onChange('');
+            setQuery('');
+          }}
+          aria-label="Limpar filtro de CNAE"
+        >
+          ×
+        </button>
+      )}
+      {open && matches.length > 0 && (
+        <div className="cnae-results">
+          {matches.map(([cod, desc]) => (
+            <button
+              key={cod}
+              onMouseDown={() => {
+                onChange(cod);
+                setQuery('');
+                setOpen(false);
+              }}
+            >
+              <b>{cod}</b> — {desc}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function FilterRow({
   label,
@@ -117,14 +187,7 @@ export function FiltersSidebar({ open }: { open: boolean }) {
       <div className="label-line">
         <span>CNAE Principal</span>
       </div>
-      <select value={filters.cnae} onChange={(e) => setFilters({ cnae: e.target.value })}>
-        <option value="">Todos</option>
-        {cnaes.map(([cod, desc]) => (
-          <option key={cod} value={cod}>
-            {cod} — {desc.slice(0, 34)}
-          </option>
-        ))}
-      </select>
+      <CnaeSearch cnaes={cnaes} value={filters.cnae} onChange={(cnae) => setFilters({ cnae })} />
 
       <div className="label-line">
         <span>Abertas após</span>

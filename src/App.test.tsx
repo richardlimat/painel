@@ -1,7 +1,15 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('./services/savedQueries', () => ({
+  listSavedQueries: vi.fn().mockResolvedValue([]),
+  getSavedQuery: vi.fn(),
+  deleteSavedQuery: vi.fn(),
+  createSavedQuery: vi.fn(),
+}));
+
 import App from './App';
 import { useGraphStore } from './store/graphStore';
 import { useAuthStore } from './store/authStore';
@@ -30,12 +38,13 @@ describe('App — tela cheia de "Carregando..." durante a busca de CNPJ', () => 
     useGraphStore.setState({ loading: true, searchPhase: 'company' });
     render(<App />);
     expect(screen.getByText('Carregando...')).toBeInTheDocument();
-    expect(screen.queryByText('Mapear estrutura societária')).not.toBeInTheDocument();
+    expect(screen.queryByText('PAINEL DE CONSULTAS')).not.toBeInTheDocument();
   });
 
   it('2. loading=false mostra o formulário de busca, sem a tela de carregando', () => {
     render(<App />);
-    expect(screen.getByText('Mapear estrutura societária')).toBeInTheDocument();
+    expect(screen.getByText('PAINEL DE CONSULTAS')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buscar' })).toBeInTheDocument();
     expect(screen.queryByText('Carregando...')).not.toBeInTheDocument();
   });
 
