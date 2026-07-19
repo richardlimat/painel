@@ -58,6 +58,7 @@ export default function App() {
     }
     return (
       <div className="flex h-screen flex-col bg-slate-100 dark:bg-slate-950">
+        <div className="h-2 w-full flex-none bg-gradient-to-r from-red-950 via-red-900 to-red-950" />
         <div className="flex items-center justify-end gap-3 px-4 py-2 text-sm text-slate-500 dark:text-slate-400">
           {user?.nome && <span>{user.nome}</span>}
           <button type="button" onClick={() => void logout()} className="hover:underline">

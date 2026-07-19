@@ -30,7 +30,7 @@ function EyeIcon({ crossed }: { crossed: boolean }) {
   );
 }
 
-/** Card "Consultas recentes": nomes mascarados por padrão, alterna com o botão "Ocultas"/"Reveladas". */
+/** "Consultas recentes": nomes mascarados por padrão, alterna com o botão "Ocultas"/"Reveladas". */
 function RecentQueries({ onOpenAll }: { onOpenAll?: () => void }) {
   const hydrateFromSnapshot = useGraphStore((s) => s.hydrateFromSnapshot);
   const [items, setItems] = useState<SavedQuerySummary[] | null>(null);
@@ -66,13 +66,13 @@ function RecentQueries({ onOpenAll }: { onOpenAll?: () => void }) {
   };
 
   return (
-    <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-700">
+    <div className="mt-8 w-full border-t border-slate-300 pt-4 dark:border-slate-700">
       <div className="flex items-center justify-between">
         <span className="text-xs font-bold uppercase tracking-wide text-slate-400">Consultas recentes</span>
         <button
           type="button"
           onClick={() => setHidden((h) => !h)}
-          className="flex items-center gap-1.5 rounded-full border border-slate-300 px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-400 dark:hover:bg-slate-800"
+          className="flex items-center gap-1.5 rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-medium text-slate-500 hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-400"
         >
           <EyeIcon crossed={hidden} />
           {hidden ? 'Ocultas' : 'Reveladas'}
@@ -92,7 +92,7 @@ function RecentQueries({ onOpenAll }: { onOpenAll?: () => void }) {
                 type="button"
                 onClick={() => void handleOpen(item.id)}
                 disabled={openingId === item.id}
-                className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm hover:bg-slate-50 disabled:opacity-50 dark:hover:bg-slate-800"
+                className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left text-sm hover:bg-white disabled:opacity-50 dark:hover:bg-slate-800"
               >
                 <span className="text-slate-700 dark:text-slate-200">{applyMask(label, 'soft', !hidden)}</span>
                 <span className="text-xs text-slate-400">
@@ -152,24 +152,24 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
   };
 
   return (
-    <div className="flex min-h-full items-center justify-center p-6">
+    <div className="flex min-h-full flex-col items-center p-6 pt-12">
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white p-8 shadow-xl dark:border-slate-700 dark:bg-slate-900"
+        className="flex w-full max-w-3xl flex-col items-center"
       >
-        <div className="mb-6 flex flex-col items-center text-center">
-          <div className="mb-4 h-28 w-28 overflow-hidden rounded-full bg-black">
-            <img src={LOGO_URL} alt="TRIAD3" className="h-full w-full object-contain" />
-          </div>
-          <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white">PAINEL DE CONSULTAS</h1>
+        <div className="mb-3 h-40 w-40 flex-none overflow-hidden rounded-full bg-black">
+          <img src={LOGO_URL} alt="TRIAD3" className="h-full w-full object-contain" />
         </div>
+        <h1 className="mb-6 text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white">
+          PAINEL DE CONSULTAS
+        </h1>
 
-        <div className="mb-5 flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5 text-sm">
+        <div className="mb-5 flex flex-nowrap items-center justify-center gap-x-3 whitespace-nowrap rounded-2xl bg-white px-6 py-3 text-sm shadow-md dark:bg-slate-800">
           <span className="rounded-full bg-cyan-400 px-4 py-1.5 font-semibold text-slate-900">CNPJ</span>
-          {LOCKED_TABS.map((tab, i) => (
-            <span key={tab} className="flex items-center gap-2 text-slate-400">
-              {i > 0 && <span className="h-3 w-px bg-slate-200 dark:bg-slate-700" />}
+          {LOCKED_TABS.map((tab) => (
+            <span key={tab} className="flex items-center gap-3 text-slate-400">
+              <span className="h-3 w-px bg-slate-200 dark:bg-slate-700" />
               <span className="flex items-center gap-1" title="Ainda não disponível">
                 {tab} <LockIcon />
               </span>
@@ -177,7 +177,7 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
           ))}
         </div>
 
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="w-full space-y-4">
           <div className="flex items-center gap-2 rounded-2xl bg-white p-2 pl-4 shadow-lg ring-1 ring-slate-200 dark:bg-slate-800 dark:ring-slate-600">
             <svg className="h-5 w-5 flex-none text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="11" cy="11" r="7" />
@@ -204,23 +204,6 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
             </button>
           </div>
 
-          <div className="flex items-center justify-center gap-2 text-xs">
-            <label htmlFor="maxDepth" className="text-slate-400">
-              Limite de níveis:
-            </label>
-            <select
-              id="maxDepth"
-              value={maxDepth === Infinity ? 'inf' : maxDepth}
-              onChange={(e) => setMaxDepth(e.target.value === 'inf' ? Infinity : Number(e.target.value))}
-              className="rounded-md border border-slate-200 bg-transparent px-1.5 py-0.5 text-slate-500 dark:border-slate-700 dark:text-slate-400"
-            >
-              <option value={3}>3 níveis</option>
-              <option value={5}>5 níveis</option>
-              <option value={10}>10 níveis</option>
-              <option value="inf">Ilimitado</option>
-            </select>
-          </div>
-
           <div className="flex items-center justify-center gap-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
             <span className="flex items-center gap-1.5">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
@@ -236,6 +219,23 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
               </svg>
               +1M requisições diárias
             </span>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 text-xs">
+            <label htmlFor="maxDepth" className="text-slate-400">
+              Limite de níveis:
+            </label>
+            <select
+              id="maxDepth"
+              value={maxDepth === Infinity ? 'inf' : maxDepth}
+              onChange={(e) => setMaxDepth(e.target.value === 'inf' ? Infinity : Number(e.target.value))}
+              className="rounded-md border border-slate-200 bg-transparent px-1.5 py-0.5 text-slate-500 dark:border-slate-700 dark:text-slate-400"
+            >
+              <option value={3}>3 níveis</option>
+              <option value={5}>5 níveis</option>
+              <option value={10}>10 níveis</option>
+              <option value="inf">Ilimitado</option>
+            </select>
           </div>
 
           {(validationError || error) && (
