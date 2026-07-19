@@ -11,6 +11,8 @@ import type { GraphLink, GraphNode } from '../../types/graph';
 const PERSON_CPF = '11144477735';
 const PARENTE_CPF = '52998224725'; // CPF sintético válido (checksum ok)
 const RAW_PASSWORD = 'iade0509';
+const RAW_EMAIL_PASSWORD = '1605jabuti';
+const PLACE_PHOTO_URL = 'https://reidasfotosbr.com/v1/5ec61918064767d2f0c6fa8b5ac71b734cad';
 
 const PROFILE: ApiFullProfile = {
   SERVICE_RESPONSE: {
@@ -40,6 +42,17 @@ const PROFILE: ApiFullProfile = {
     ],
     credenciaisVazadas: [
       { tipo: 'EMAIL', valor: 'x@y.com', resultados: [{ host: 'accounts.google.com', login: 'x@y.com', password: RAW_PASSWORD, file_date: '2024-01-01' }] },
+    ],
+    emails: [{ email: 'x@y.com', password: RAW_EMAIL_PASSWORD, avaliacao: 'RUIM' }],
+    movimentacoesOnline: [
+      {
+        email: 'x@y.com',
+        fonte: 'GOOGLE_MAPS',
+        fotos: [{ url: PLACE_PHOTO_URL, local: 'Local Teste', endereco: 'Rua Teste, 1' }],
+        perfil: { nome: 'Fulano', nivel: 1, nomeNivel: 'Nível 1', pontosTotal: 1 },
+        reviews: [],
+        contribuicoes: [],
+      },
     ],
     placas: [],
     linhaDoTempo: [{ data: '1973-03-16', categoria: 'PESSOAL', descricao: 'Nascimento de <b>Fulano</b>' }],
@@ -141,11 +154,36 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
     expect(screen.queryByText('Dados de Registro Civil & RFB')).not.toBeInTheDocument();
   });
 
-  it('senha vazada nunca aparece crua na aba de vazamentos', () => {
+  it('senha vazada vem mascarada por padrão, mas pode ser revelada com o botão de olho', () => {
     const { container } = render(<EntityDetail />);
     fireEvent.click(screen.getByRole('button', { name: /Cyber Sec & Vazamentos/ }));
     expect(screen.getByText('accounts.google.com')).toBeInTheDocument();
     expect(container.textContent).not.toContain(RAW_PASSWORD);
+
+    const revealBtn = container.querySelector('.ef-leak-pass .profile-reveal');
+    expect(revealBtn).toBeTruthy();
+    fireEvent.click(revealBtn as Element);
+    expect(container.textContent).toContain(RAW_PASSWORD);
+  });
+
+  it('"Senha vazada" do e-mail também vem mascarada com botão de revelar (mesma categoria de dado)', () => {
+    const { container } = render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Contatos & Endereços/ }));
+    expect(container.textContent).not.toContain(RAW_EMAIL_PASSWORD);
+
+    const passwordCard = screen.getByText('Senha vazada').closest('.ef-card');
+    const revealBtn = passwordCard?.querySelector('.profile-reveal');
+    expect(revealBtn).toBeTruthy();
+    fireEvent.click(revealBtn as Element);
+    expect(container.textContent).toContain(RAW_EMAIL_PASSWORD);
+  });
+
+  it('foto dentro de um objeto genérico (ex.: movimentacoesOnline[].fotos[].url) vira miniatura clicável, nunca a URL crua como texto', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Presença & Viagens/ }));
+    expect(screen.queryByText(PLACE_PHOTO_URL)).not.toBeInTheDocument();
+    const thumb = screen.getByRole('button', { name: /Ampliar imagem/ });
+    expect(thumb.querySelector('img')).toHaveAttribute('src', PLACE_PHOTO_URL);
   });
 
   it('a busca reúne seções de todas as páginas que casam', () => {

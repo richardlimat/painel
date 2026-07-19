@@ -20,6 +20,7 @@ import {
   fmtRg,
   fmtSexo,
 } from './profileFormat';
+import type { MaskClass } from './mask';
 
 export type SectionKind = 'fields' | 'list' | 'people' | 'leaks' | 'timeline' | 'flags' | 'generic';
 
@@ -31,6 +32,8 @@ export interface FieldSpec {
   format?: (value: unknown) => string;
   /** Chave usada para decidir mascaramento (default: último segmento de `path`). */
   maskKey?: string;
+  /** Força a classe de mascaramento, ignorando `classifyKey` (ex.: senha vazada — revelável, ao contrário de credencial do próprio sistema). */
+  maskOverride?: MaskClass;
   /** Chaves cruas consumidas por este campo (além do topo de `path`) — evita duplicá-las no "restante". */
   consumes?: string[];
 }
@@ -152,7 +155,7 @@ export const PROFILE_PAGES: PageSpec[] = [
       ] },
       { title: 'E-mails', source: 'emails', kind: 'list', alwaysShow: true, emptyText: 'Nenhum e-mail encontrado.', fields: [
         { label: 'E-mail', path: 'email', maskKey: 'email' },
-        { label: 'Senha vazada', path: 'password', maskKey: 'password' },
+        { label: 'Senha vazada', path: 'password', maskOverride: 'soft' },
         { label: 'Avaliação', path: 'avaliacao' },
       ] },
       { title: 'Endereços', source: 'enderecos', kind: 'list', alwaysShow: true, emptyText: 'Nenhum endereço encontrado.', fields: [

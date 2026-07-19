@@ -117,10 +117,34 @@ export function ImageUrlValue({ url, alt, onOpen }: { url: string; alt: string; 
   );
 }
 
+/** Ícone de olho (aberto/fechado) do botão de revelar — só indicação visual, ver `MaskedValue`. */
+function EyeIcon({ open }: { open: boolean }) {
+  if (!open) {
+    return (
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path
+        d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.6 19.6 0 0 1 5.06-5.94M9.9 5.1A10.94 10.94 0 0 1 12 5c7 0 11 7 11 7a19.5 19.5 0 0 1-2.27 3.34"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M1 1l22 22" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /**
- * Campos "soft" mascaram por padrão com botão de revelar — conveniência de
- * UI, não controle de acesso (ver README). Campos "hard" nunca mostram
- * "Revelar" — applyMask já garante isso independente do estado local.
+ * Campos "soft" mascaram por padrão com botão de revelar (ícone de olho) —
+ * conveniência de UI, não controle de acesso (ver README). Campos "hard"
+ * nunca mostram o botão — `applyMask` já garante isso independente do
+ * estado local.
  */
 export function MaskedValue({ value, cls }: { value: string; cls: MaskClass }) {
   const [revealed, setRevealed] = useState(false);
@@ -128,8 +152,14 @@ export function MaskedValue({ value, cls }: { value: string; cls: MaskClass }) {
     <span className="profile-masked">
       <span>{applyMask(value, cls, revealed)}</span>
       {cls === 'soft' && (
-        <button type="button" className="profile-reveal" onClick={() => setRevealed((r) => !r)}>
-          {revealed ? 'Ocultar' : 'Revelar'}
+        <button
+          type="button"
+          className="profile-reveal"
+          onClick={() => setRevealed((r) => !r)}
+          aria-label={revealed ? 'Ocultar valor' : 'Revelar valor'}
+          title={revealed ? 'Ocultar' : 'Revelar'}
+        >
+          <EyeIcon open={revealed} />
         </button>
       )}
     </span>
@@ -148,14 +178,16 @@ export function ProfileLeafValue({
   value,
   query,
   onOpenImage,
+  containerKey,
 }: {
   keyName: string;
   label: string;
   value: unknown;
   query: string;
   onOpenImage: (url: string) => void;
+  containerKey?: string;
 }): ReactNode | null {
-  const leaf = classifyLeaf(keyName, value);
+  const leaf = classifyLeaf(keyName, value, containerKey);
   if (!leaf) return null;
   switch (leaf.kind) {
     case 'image':
@@ -264,14 +296,16 @@ function CardScalar({
   value,
   query,
   onOpenImage,
+  containerKey,
 }: {
   keyName: string;
   label: string;
   value: unknown;
   query: string;
   onOpenImage: (url: string) => void;
+  containerKey?: string;
 }) {
-  const leaf = ProfileLeafValue({ keyName, label, value, query, onOpenImage });
+  const leaf = ProfileLeafValue({ keyName, label, value, query, onOpenImage, containerKey });
   return leaf ?? <span className="profile-row-value">{highlightMatch(formatScalarValue(keyName, value), query)}</span>;
 }
 
@@ -288,11 +322,14 @@ export function ProfileCardEntries({
   query,
   onOpenImage,
   depth = 0,
+  containerKey,
 }: {
   entries: [string, unknown][];
   query: string;
   onOpenImage: (url: string) => void;
   depth?: number;
+  /** Chave do array/objeto que envolve estas entradas (ex.: "fotos") — repassada só até as folhas escalares, para reconhecer `{ url: "..." }` dentro de uma coleção de fotos. */
+  containerKey?: string;
 }) {
   if (depth > MAX_RENDER_DEPTH) {
     return <p className="ef-empty">…</p>;
@@ -308,7 +345,7 @@ export function ProfileCardEntries({
             <div className="ef-card" key={k}>
               <span className="ef-card-label">{highlightMatch(humanizeKey(k), query)}</span>
               <div className="ef-card-value">
-                <CardScalar keyName={k} label={humanizeKey(k)} value={v} query={query} onOpenImage={onOpenImage} />
+                <CardScalar keyName={k} label={humanizeKey(k)} value={v} query={query} onOpenImage={onOpenImage} containerKey={containerKey} />
               </div>
             </div>
           ))}
@@ -370,6 +407,7 @@ export function ProfileValueBlock({
                     query={query}
                     onOpenImage={onOpenImage}
                     depth={depth + 1}
+                    containerKey={keyName}
                   />
                 )}
               </div>
@@ -384,7 +422,7 @@ export function ProfileValueBlock({
   if (value !== null && typeof value === 'object') {
     const entries = Object.entries(value as Record<string, unknown>);
     if (entries.length === 0) return <p className="ef-empty">Nenhum registro encontrado</p>;
-    return <ProfileCardEntries entries={entries} query={query} onOpenImage={onOpenImage} depth={depth + 1} />;
+    return <ProfileCardEntries entries={entries} query={query} onOpenImage={onOpenImage} depth={depth + 1} containerKey={keyName} />;
   }
 
   return (
