@@ -1430,14 +1430,21 @@
   gap: 6px;
 }
 .profile-reveal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   background: transparent;
   color: var(--muted);
-  font-size: 10px;
-  text-decoration: underline;
-  padding: 0;
+  padding: 2px;
   white-space: nowrap;
   flex: none;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.profile-reveal:hover {
+  color: var(--ink);
+  background: rgba(17, 24, 39, 0.06);
 }
 .profile-masked {
   flex-wrap: wrap;

@@ -19,7 +19,7 @@ const lastSegment = (path: string) => path.split('.').pop() ?? path;
 function FieldCard({ field, source, query }: { field: FieldSpec; source: unknown; query: string }) {
   const raw = field.path === '' ? source : getPath(source, field.path);
   const formatted = field.format ? field.format(raw) : fmtText(raw);
-  const cls = classifyKey(field.maskKey ?? lastSegment(field.path));
+  const cls = field.maskOverride ?? classifyKey(field.maskKey ?? lastSegment(field.path));
 
   let value: ReactNode;
   if (formatted === '—') {
@@ -233,7 +233,7 @@ function PeopleSection({
   );
 }
 
-/** Credenciais vazadas: agrupadas por alvo (e-mail/usuário); senha SEMPRE mascarada (hard). */
+/** Credenciais vazadas: agrupadas por alvo (e-mail/usuário); senha mascarada por padrão, com botão de revelar. */
 function LeaksSection({ items, query }: { items: unknown[]; query: string }) {
   return (
     <div className="ef-records">
@@ -261,7 +261,7 @@ function LeaksSection({ items, query }: { items: unknown[]; query: string }) {
                       <MaskedValue value={fmtText(res.login)} cls="soft" />
                     </span>
                     <span className="ef-leak-pass">
-                      <MaskedValue value={fmtText(res.password)} cls="hard" />
+                      <MaskedValue value={fmtText(res.password)} cls="soft" />
                     </span>
                     <span className="ef-leak-date">{fmtDate(res.file_date)}</span>
                   </div>

@@ -17,15 +17,26 @@ const BASE64_CHARSET_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const DOCUMENT_KEY_HINT_RE = /(base64|docsbase64|foto|imagem|imagembase64|documento|pdf|anexo)/;
 const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i;
 const IMAGE_KEY_HINT_RE = /(foto|imagem|selfie|fotografia|avatar|picture|photo)/;
+// Chave genérica de URL (ex.: `fotos: [{ url: "..." }]`) que só deve virar
+// imagem quando a chave que a contém já sugere foto — evita falso-positivo
+// em qualquer outro "url"/"link" solto do JSON (ex.: link de vazamento).
+const GENERIC_URL_KEY_RE = /^(url|link|href|src)$/;
 
 /**
  * URL (http/https apenas — `javascript:`/`data:`/`file:` nunca passam aqui,
  * ver `isSafeHttpUrl`) que deve virar miniatura clicável em vez de texto.
+ * `containerKey` é a chave do objeto/array que envolve este campo (ex.:
+ * "fotos" ao redor de `{ url: "..." }`) — usado só como fallback quando o
+ * nome do próprio campo não é sugestivo.
  */
-export function isLikelyImageUrl(key: string, value: unknown): boolean {
+export function isLikelyImageUrl(key: string, value: unknown, containerKey?: string): boolean {
   if (!isSafeHttpUrl(value)) return false;
   if (IMAGE_EXT_RE.test(value)) return true;
-  return IMAGE_KEY_HINT_RE.test(key.toLowerCase());
+  if (IMAGE_KEY_HINT_RE.test(key.toLowerCase())) return true;
+  if (containerKey && GENERIC_URL_KEY_RE.test(key.toLowerCase()) && IMAGE_KEY_HINT_RE.test(containerKey.toLowerCase())) {
+    return true;
+  }
+  return false;
 }
 
 /**
@@ -120,8 +131,8 @@ export type ProfileLeaf =
   | { kind: 'masked'; cls: MaskClass; value: string }
   | { kind: 'text'; value: string };
 
-export function classifyLeaf(keyName: string, value: unknown): ProfileLeaf | null {
-  if (typeof value === 'string' && isLikelyImageUrl(keyName, value)) return { kind: 'image', url: value };
+export function classifyLeaf(keyName: string, value: unknown, containerKey?: string): ProfileLeaf | null {
+  if (typeof value === 'string' && isLikelyImageUrl(keyName, value, containerKey)) return { kind: 'image', url: value };
   if (typeof value === 'string' && isLikelyDocumentBlob(keyName, value)) return { kind: 'document', base64: value };
   const cls = classifyKey(keyName);
   if (cls !== 'none' && typeof value === 'string' && value !== '') return { kind: 'masked', cls, value };
