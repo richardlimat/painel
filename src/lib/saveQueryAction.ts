@@ -17,7 +17,7 @@ export async function saveCurrentQuery(titulo?: string): Promise<{ id: string; i
   const profilesByCpf = usePersonProfileStore.getState().profilesByCpf;
   const images = buildImageAssetsForSave(graphState.nodes, profilesByCpf);
   const rootNode = graphState.nodes.find((n) => n.id === graphState.rootId);
-  const cnpjRaiz = rootNode?.company?.cnpj ?? '';
+  const cnpjRaiz = rootNode?.company?.cnpj ?? rootNode?.person?.cpf ?? '';
 
   const result = await createSavedQuery({ titulo, cnpjRaiz, snapshot, images });
   useGraphStore.getState().markSaved();

@@ -23,12 +23,12 @@ describe('SearchForm — branding e busca de CNPJ', () => {
   });
   afterEach(() => cleanup());
 
-  it('1. mostra o logo, o título e as abas (só CNPJ habilitada)', () => {
+  it('1. mostra o logo, o título, e as abas CNPJ/Consulta Avançada habilitadas', () => {
     render(<SearchForm />);
     expect(screen.getByAltText('TRIAD3')).toBeInTheDocument();
     expect(screen.getByText('PAINEL DE CONSULTAS')).toBeInTheDocument();
-    expect(screen.getByText('CNPJ')).toBeInTheDocument();
-    expect(screen.getByText('Consulta Avançada')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'CNPJ' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Consulta Avançada' })).toBeInTheDocument();
     expect(screen.getByText('SMS')).toBeInTheDocument();
   });
 
@@ -49,6 +49,54 @@ describe('SearchForm — branding e busca de CNPJ', () => {
     fireEvent.change(screen.getByPlaceholderText('00.000.000/0000-00'), { target: { value: '33.260.563/0001-78' } });
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(startSearch).toHaveBeenCalledWith('33260563000178');
+  });
+});
+
+describe('SearchForm — Consulta Avançada (busca por CPF)', () => {
+  beforeEach(() => {
+    listSavedQueriesMock.mockReset().mockResolvedValue([]);
+    getSavedQueryMock.mockReset();
+    useGraphStore.setState({ error: null, searchPhase: 'idle', searchFailedCpfs: [], searchProfilesTotal: 0 });
+  });
+  afterEach(() => cleanup());
+
+  it('1. clicar em "Consulta Avançada" troca o campo para máscara de CPF', () => {
+    render(<SearchForm />);
+    fireEvent.click(screen.getByRole('button', { name: 'Consulta Avançada' }));
+    expect(screen.getByPlaceholderText('000.000.000-00')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('00.000.000/0000-00')).not.toBeInTheDocument();
+  });
+
+  it('2. rejeita CPF com dígitos verificadores inválidos sem chamar startPersonSearch', () => {
+    const startPersonSearch = vi.fn();
+    useGraphStore.setState({ startPersonSearch });
+    render(<SearchForm />);
+    fireEvent.click(screen.getByRole('button', { name: 'Consulta Avançada' }));
+    fireEvent.change(screen.getByPlaceholderText('000.000.000-00'), { target: { value: '111.444.777-36' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    expect(screen.getByText(/CPF inválido/)).toBeInTheDocument();
+    expect(startPersonSearch).not.toHaveBeenCalled();
+  });
+
+  it('3. CPF válido chama startPersonSearch com os 11 dígitos', () => {
+    const startPersonSearch = vi.fn();
+    useGraphStore.setState({ startPersonSearch });
+    render(<SearchForm />);
+    fireEvent.click(screen.getByRole('button', { name: 'Consulta Avançada' }));
+    fireEvent.change(screen.getByPlaceholderText('000.000.000-00'), { target: { value: '111.444.777-35' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
+    expect(startPersonSearch).toHaveBeenCalledWith('11144477735');
+  });
+
+  it('4. alternar entre CNPJ e CPF preserva o texto digitado em cada campo', () => {
+    render(<SearchForm />);
+    fireEvent.change(screen.getByPlaceholderText('00.000.000/0000-00'), { target: { value: '33.260.563/0001-78' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Consulta Avançada' }));
+    fireEvent.change(screen.getByPlaceholderText('000.000.000-00'), { target: { value: '111.444.777-35' } });
+    fireEvent.click(screen.getByRole('button', { name: 'CNPJ' }));
+    expect(screen.getByPlaceholderText('00.000.000/0000-00')).toHaveValue('33.260.563/0001-78');
+    fireEvent.click(screen.getByRole('button', { name: 'Consulta Avançada' }));
+    expect(screen.getByPlaceholderText('000.000.000-00')).toHaveValue('111.444.777-35');
   });
 });
 

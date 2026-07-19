@@ -79,4 +79,13 @@ describe('saveCurrentQuery', () => {
     await expect(saveCurrentQuery()).rejects.toThrow('falhou');
     expect(useGraphStore.getState().unsavedChanges).toBe(true);
   });
+
+  it('5. quando a raiz é uma pessoa (Consulta Avançada por CPF), cnpjRaiz cai para o CPF da raiz', async () => {
+    createSavedQueryMock.mockResolvedValue({ id: 'q2', imagesFailed: 0 });
+    useGraphStore.setState({ rootId: personId(CPF) });
+    await saveCurrentQuery();
+    const payload = createSavedQueryMock.mock.calls[0][0];
+    expect(payload.cnpjRaiz).toBe(CPF);
+    expect(payload.snapshot.rootId).toBe(personId(CPF));
+  });
 });

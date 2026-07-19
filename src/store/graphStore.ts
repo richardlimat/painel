@@ -10,7 +10,7 @@ import type {
   TimelineEvent,
 } from '../types/graph';
 import { defaultFilters } from '../types/graph';
-import { isValidCPF, onlyDigits } from '../lib/format';
+import { formatCPF, isValidCPF, onlyDigits } from '../lib/format';
 import type { DataProvider } from '../services/provider';
 import {
   FORCE_DEFAULTS,
@@ -123,6 +123,8 @@ interface GraphState {
   notify: (msg: string) => void;
   clearNotice: () => void;
   startSearch: (cnpj: string) => Promise<void>;
+  /** Busca por CPF ("Consulta Avançada") — abre o mapa com a pessoa na raiz e suas empresas. */
+  startPersonSearch: (cpf: string) => Promise<void>;
   /** Reprocessa só os CPFs que falharam no lote da busca inicial (ou de uma tentativa anterior). */
   retryFailedSearchProfiles: () => Promise<void>;
   /** Libera o mapa mesmo com falhas pendentes — ação explícita do usuário. */
@@ -691,6 +693,99 @@ export const useGraphStore = create<GraphState>((set, get) => ({
         // usuário escolher "Tentar novamente" ou "Continuar com os dados disponíveis".
         set({ searchFailedCpfs: failed, searchPhase: 'awaiting-decision', loading: false });
       }
+    } catch (e) {
+      if (get().graphEpoch !== epoch) return;
+      set({ loading: false, error: e instanceof Error ? e.message : 'Erro na consulta', searchPhase: 'error' });
+    }
+  },
+
+  startPersonSearch: async (cpf: string) => {
+    const digits = onlyDigits(cpf);
+    usePersonProfileStore.getState().cancelPendingQueue();
+    const epoch = get().graphEpoch + 1;
+    set({
+      loading: true,
+      error: null,
+      nodes: [],
+      links: [],
+      nodeIndex: new Map(),
+      timeline: [],
+      breadcrumb: [],
+      selectedNodeId: null,
+      rootId: null,
+      graphEpoch: epoch,
+      searchPhase: 'company',
+      searchProfilesTotal: 0,
+      searchProfilesDone: 0,
+      searchProfilesFailed: 0,
+      searchFailedCpfs: [],
+      searchPendingRootId: null,
+    });
+    try {
+      const profile = await usePersonProfileStore.getState().loadProfile(digits);
+      if (get().graphEpoch !== epoch) return;
+
+      const sociedades = extractSociedades(profile);
+      const nome =
+        sociedades.find((s) => onlyDigits(s.documentoSocio) === digits)?.nomeSocio ??
+        sociedades[0]?.nomeSocio ??
+        formatCPF(digits);
+
+      const rootId = personId(digits);
+      const rootNode: GraphNode = {
+        id: rootId,
+        kind: 'person',
+        label: nome,
+        depth: 0,
+        expanded: sociedades.length === 0,
+        person: { cpf: digits, nome },
+      };
+      const nodeIndex = new Map(get().nodeIndex);
+      nodeIndex.set(rootId, rootNode);
+      set({ nodes: [...nodeIndex.values()], nodeIndex });
+
+      if (sociedades.length === 0) {
+        set({
+          rootId,
+          loading: false,
+          breadcrumb: [rootId],
+          currentLayer: 1,
+          layerLoading: false,
+          searchPhase: 'done',
+          unsavedChanges: true,
+        });
+        return;
+      }
+
+      set({ searchPhase: 'profiles', searchProfilesTotal: sociedades.length });
+      for (const s of sociedades) {
+        set(mergeApiFullSociedadeRelation(get(), rootNode, s, 1));
+      }
+      if (get().graphEpoch !== epoch) return;
+
+      const pendingCnpjs = [...new Set(sociedades.map((s) => s.cnpj))];
+      usePersonProfileStore.getState().setSociedadesStatus(digits, { pending: pendingCnpjs, succeeded: [], failed: [] });
+
+      set({ searchPhase: 'preparing' });
+      const { failedCount } = await processPendingSociedades(get, set, digits, pendingCnpjs, 1, epoch);
+      if (get().graphEpoch !== epoch) return;
+
+      rootNode.expanded = failedCount === 0;
+      if (failedCount > 0) {
+        get().notify(
+          `Busca com falha parcial: ${failedCount} de ${pendingCnpjs.length} empresa(s) falharam ao consultar ${nome}. Clique na pessoa para tentar de novo.`,
+        );
+      }
+      set({
+        nodes: [...get().nodeIndex.values()],
+        rootId,
+        loading: false,
+        breadcrumb: [rootId],
+        currentLayer: 1,
+        layerLoading: false,
+        searchPhase: 'done',
+        unsavedChanges: true,
+      });
     } catch (e) {
       if (get().graphEpoch !== epoch) return;
       set({ loading: false, error: e instanceof Error ? e.message : 'Erro na consulta', searchPhase: 'error' });

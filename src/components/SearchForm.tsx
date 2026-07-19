@@ -1,13 +1,13 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGraphStore } from '../store/graphStore';
-import { isValidCNPJ, maskCNPJ, onlyDigits, formatDate } from '../lib/format';
+import { isValidCNPJ, isValidCPF, maskCNPJ, maskCPF, onlyDigits, formatDate } from '../lib/format';
 import { applyMask } from '../lib/mask';
 import { listSavedQueries, getSavedQuery, type SavedQuerySummary } from '../services/savedQueries';
 
 const LOGO_URL = 'https://aisfizoyfpcisykarrnt.supabase.co/storage/v1/object/public/imagens/LOGO%20TRIAD3%20.png';
 
-const LOCKED_TABS = ['Consulta Avançada', 'SMS', 'Placa', 'Email', 'Nome'];
+const LOCKED_TABS = ['SMS', 'Placa', 'Email', 'Nome'];
 
 const RECENT_LIMIT = 5;
 
@@ -125,6 +125,7 @@ function RecentQueries({ onOpenAll }: { onOpenAll?: () => void }) {
  */
 export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => void }) {
   const startSearch = useGraphStore((s) => s.startSearch);
+  const startPersonSearch = useGraphStore((s) => s.startPersonSearch);
   const retryFailedSearchProfiles = useGraphStore((s) => s.retryFailedSearchProfiles);
   const continueWithAvailableData = useGraphStore((s) => s.continueWithAvailableData);
   const error = useGraphStore((s) => s.error);
@@ -133,22 +134,43 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
   const searchFailedCpfs = useGraphStore((s) => s.searchFailedCpfs);
   const maxDepth = useGraphStore((s) => s.maxDepth);
   const setMaxDepth = useGraphStore((s) => s.setMaxDepth);
+  const [mode, setMode] = useState<'cnpj' | 'cpf'>('cnpj');
   const [cnpj, setCnpj] = useState('');
+  const [cpf, setCpf] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const switchMode = (m: 'cnpj' | 'cpf') => {
+    setMode(m);
+    setValidationError(null);
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    const digits = onlyDigits(cnpj);
-    if (digits.length !== 14) {
-      setValidationError('Informe um CNPJ com 14 dígitos.');
-      return;
+    if (mode === 'cnpj') {
+      const digits = onlyDigits(cnpj);
+      if (digits.length !== 14) {
+        setValidationError('Informe um CNPJ com 14 dígitos.');
+        return;
+      }
+      if (!isValidCNPJ(digits)) {
+        setValidationError('CNPJ inválido (dígitos verificadores não conferem).');
+        return;
+      }
+      setValidationError(null);
+      void startSearch(digits);
+    } else {
+      const digits = onlyDigits(cpf);
+      if (digits.length !== 11) {
+        setValidationError('Informe um CPF com 11 dígitos.');
+        return;
+      }
+      if (!isValidCPF(digits)) {
+        setValidationError('CPF inválido (dígitos verificadores não conferem).');
+        return;
+      }
+      setValidationError(null);
+      void startPersonSearch(digits);
     }
-    if (!isValidCNPJ(digits)) {
-      setValidationError('CNPJ inválido (dígitos verificadores não conferem).');
-      return;
-    }
-    setValidationError(null);
-    void startSearch(digits);
   };
 
   return (
@@ -166,7 +188,29 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
         </h1>
 
         <div className="mb-5 flex flex-nowrap items-center justify-center gap-x-3 whitespace-nowrap rounded-2xl bg-white px-6 py-3 text-sm shadow-md dark:bg-slate-800">
-          <span className="rounded-full bg-cyan-400 px-4 py-1.5 font-semibold text-slate-900">CNPJ</span>
+          <button
+            type="button"
+            onClick={() => switchMode('cnpj')}
+            className={
+              mode === 'cnpj'
+                ? 'rounded-full bg-cyan-400 px-4 py-1.5 font-semibold text-slate-900'
+                : 'rounded-full px-4 py-1.5 font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }
+          >
+            CNPJ
+          </button>
+          <span className="h-3 w-px bg-slate-200 dark:bg-slate-700" />
+          <button
+            type="button"
+            onClick={() => switchMode('cpf')}
+            className={
+              mode === 'cpf'
+                ? 'rounded-full bg-cyan-400 px-4 py-1.5 font-semibold text-slate-900'
+                : 'rounded-full px-4 py-1.5 font-medium text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }
+          >
+            Consulta Avançada
+          </button>
           {LOCKED_TABS.map((tab) => (
             <span key={tab} className="flex items-center gap-3 text-slate-400">
               <span className="h-3 w-px bg-slate-200 dark:bg-slate-700" />
@@ -183,15 +227,27 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
               <circle cx="11" cy="11" r="7" />
               <path d="m20 20-4-4" />
             </svg>
-            <input
-              id="cnpj"
-              value={cnpj}
-              onChange={(e) => setCnpj(maskCNPJ(e.target.value))}
-              placeholder="00.000.000/0000-00"
-              inputMode="numeric"
-              className="min-w-0 flex-1 border-0 bg-transparent py-2 text-base tracking-wide text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"
-              autoFocus
-            />
+            {mode === 'cnpj' ? (
+              <input
+                id="cnpj"
+                value={cnpj}
+                onChange={(e) => setCnpj(maskCNPJ(e.target.value))}
+                placeholder="00.000.000/0000-00"
+                inputMode="numeric"
+                className="min-w-0 flex-1 border-0 bg-transparent py-2 text-base tracking-wide text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"
+                autoFocus
+              />
+            ) : (
+              <input
+                id="cpf"
+                value={cpf}
+                onChange={(e) => setCpf(maskCPF(e.target.value))}
+                placeholder="000.000.000-00"
+                inputMode="numeric"
+                className="min-w-0 flex-1 border-0 bg-transparent py-2 text-base tracking-wide text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"
+                autoFocus
+              />
+            )}
             <button
               type="submit"
               className="flex flex-none items-center gap-2 rounded-xl bg-cyan-400 px-5 py-2.5 text-sm font-bold text-slate-900 transition hover:bg-cyan-300"

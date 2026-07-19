@@ -25,6 +25,16 @@ export function maskCNPJ(value: string): string {
   return out;
 }
 
+/** Máscara progressiva para digitação de CPF (não preenche zeros) */
+export function maskCPF(value: string): string {
+  const d = onlyDigits(value).slice(0, 11);
+  let out = d;
+  if (d.length > 3) out = `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length > 6) out = `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  if (d.length > 9) out = `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+  return out;
+}
+
 export function isValidCNPJ(value: string): boolean {
   const d = onlyDigits(value);
   if (d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false;

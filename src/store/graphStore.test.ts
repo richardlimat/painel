@@ -631,6 +631,160 @@ describe('startSearch — mapa só abre após o lote da APIFull; sem race condit
   });
 });
 
+describe('startPersonSearch — Consulta Avançada (busca por CPF)', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    resetStores();
+    fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('1. CPF sem sociedades abre o mapa só com o nó pessoa (label = CPF formatado)', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) return apiFullSuccess([]);
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    expect(state.rootId).toBe(personId(PERSON_CPF));
+    expect(state.searchPhase).toBe('done');
+    expect(state.loading).toBe(false);
+    expect(state.nodes).toHaveLength(1);
+    expect(state.nodeIndex.get(personId(PERSON_CPF))?.label).toBe('111.444.777-35');
+    expect(state.nodeIndex.get(personId(PERSON_CPF))?.expanded).toBe(true);
+  });
+
+  it('2. CPF com sociedades cria os nós placeholder, enriquece via FonteData e abre o mapa', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        return apiFullSuccess([
+          {
+            cnpj: NEW_CNPJ,
+            razao_social: 'EMPRESA NOVA LTDA',
+            situacao_cadastral: 'ATIVA',
+            qualificacao_socio_descricao: 'Sócio',
+            dt_entrada: '10/05/2024',
+            nome_socio: 'FULANO DE TAL',
+            documento_socio: PERSON_CPF,
+          },
+        ]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    const rootId = personId(PERSON_CPF);
+    expect(state.rootId).toBe(rootId);
+    expect(state.nodeIndex.get(rootId)?.label).toBe('FULANO DE TAL');
+    expect(state.nodeIndex.get(rootId)?.expanded).toBe(true);
+    const company = state.nodeIndex.get(companyId(NEW_CNPJ));
+    expect(company?.depth).toBe(1);
+    expect(company?.company?.razaoSocial).toBe(`EMPRESA ${NEW_CNPJ} LTDA`);
+    expect(state.searchPhase).toBe('done');
+  });
+
+  it('3. falha ao buscar o perfil do CPF raiz não abre o mapa', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) return jsonResponse({ message: 'erro' }, 500);
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    expect(state.rootId).toBeNull();
+    expect(state.searchPhase).toBe('error');
+    expect(state.error).toBeTruthy();
+  });
+
+  it('4. falha parcial no enriquecimento de uma sociedade ainda assim abre o mapa, com a pessoa não-expandida', async () => {
+    fetchMock.mockImplementation(async (url: string) => {
+      if (url.includes('/api/cpf-ultra')) {
+        return apiFullSuccess([
+          {
+            cnpj: NEW_CNPJ,
+            qualificacao_socio_descricao: 'Sócio',
+            documento_socio: PERSON_CPF,
+            nome_socio: 'FULANO DE TAL',
+          },
+          {
+            cnpj: FAILING_CNPJ,
+            qualificacao_socio_descricao: 'Sócio',
+            documento_socio: PERSON_CPF,
+            nome_socio: 'FULANO DE TAL',
+          },
+        ]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
+      }
+      if (url.includes(`CNPJ=${FAILING_CNPJ}`)) {
+        return jsonResponse({ code: 'invalid_parameters', message: 'erro simulado' }, 400);
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    await useGraphStore.getState().startPersonSearch(PERSON_CPF);
+
+    const state = useGraphStore.getState();
+    const rootId = personId(PERSON_CPF);
+    expect(state.rootId).toBe(rootId); // falha parcial não bloqueia a abertura do mapa
+    expect(state.nodeIndex.get(rootId)?.expanded).toBe(false); // permite tentar de novo
+    expect(state.notice).toMatch(/parcial/i);
+  });
+
+  it('5. busca por CPF antiga nunca abre nem substitui o mapa da busca atual', async () => {
+    // A tem uma sociedade cujo enriquecimento na FonteData fica pendente (controlável);
+    // B é uma busca completamente nova, sem sociedades, que conclui primeiro. O próprio
+    // perfil da APIFull (que passa pela fila serial única do personProfileStore) resolve
+    // na hora para as duas — a "corrida" real acontece no enriquecimento via FonteData,
+    // que não passa por essa fila (mesmo padrão do teste equivalente de startSearch).
+    let resolveCompanyA: (() => void) | undefined;
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url.includes('/api/cpf-ultra')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
+        if (body.cpf === PERSON_CPF) {
+          return apiFullSuccess([
+            { cnpj: NEW_CNPJ, qualificacao_socio_descricao: 'Sócio', documento_socio: PERSON_CPF, nome_socio: 'FULANO DE TAL' },
+          ]);
+        }
+        return apiFullSuccess([]);
+      }
+      if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
+        return new Promise((resolve) => {
+          resolveCompanyA = () => resolve(fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]));
+        });
+      }
+      return jsonResponse({ message: 'unexpected' }, 404);
+    });
+
+    const searchA = useGraphStore.getState().startPersonSearch(PERSON_CPF);
+    await vi.waitFor(() => {
+      if (!resolveCompanyA) throw new Error('ainda não chegou no enriquecimento via FonteData');
+    });
+
+    await useGraphStore.getState().startPersonSearch(OUTRO_SOCIO_CPF); // B conclui primeiro
+    expect(useGraphStore.getState().rootId).toBe(personId(OUTRO_SOCIO_CPF));
+
+    resolveCompanyA?.(); // A finalmente responde, tarde demais
+    await searchA;
+
+    expect(useGraphStore.getState().rootId).toBe(personId(OUTRO_SOCIO_CPF));
+  });
+});
+
 describe('foto da pessoa — atualiza o nó automaticamente quando o perfil resolve', () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
