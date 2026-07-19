@@ -37,6 +37,18 @@ export function isValidCNPJ(value: string): boolean {
   return calc(12) === Number(d[12]) && calc(13) === Number(d[13]);
 }
 
+export function isValidCPF(value: string): boolean {
+  const d = onlyDigits(value);
+  if (d.length !== 11 || /^(\d)\1{10}$/.test(d)) return false;
+  const calc = (len: number) => {
+    let sum = 0;
+    for (let i = 0; i < len; i++) sum += Number(d[i]) * (len + 1 - i);
+    const mod = (sum * 10) % 11;
+    return mod === 10 ? 0 : mod;
+  };
+  return calc(9) === Number(d[9]) && calc(10) === Number(d[10]);
+}
+
 export function formatCurrency(value?: number): string {
   if (value == null) return '—';
   return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });

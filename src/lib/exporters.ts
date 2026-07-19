@@ -65,26 +65,53 @@ export function exportJson(nodes: GraphNode[], links: GraphLink[]) {
   downloadBlob(JSON.stringify(payload, null, 2), 'application/json', 'grafo-societario.json');
 }
 
-export function exportCsv(nodes: GraphNode[], links: GraphLink[]) {
+const CSV_HEADER = [
+  'origem',
+  'origem_tipo',
+  'destino',
+  'destino_tipo',
+  'relacao',
+  'data_entrada',
+  'situacao',
+  'origem_informacao',
+  // Colunas societárias: todas as relações/qualificações/origens/datas acumuladas
+  // (ver RelationshipMeta.evidencias) — não só a "principal". Nunca inclui o
+  // perfil completo da APIFull, só metadados de relação já presentes no grafo.
+  'relacoes',
+  'qualificacoes',
+  'origens_informacao',
+  'datas_entrada',
+];
+
+function csvEscape(v: unknown): string {
+  const s = String(v ?? '');
+  return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/** Monta as linhas do CSV (puro, sem download) — testável sem DOM. */
+export function buildCsvRows(nodes: GraphNode[], links: GraphLink[]): string[][] {
   const byId = new Map(nodes.map((n) => [n.id, n]));
-  const esc = (v: unknown) => {
-    const s = String(v ?? '');
-    return /[";\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const header = ['origem', 'origem_tipo', 'destino', 'destino_tipo', 'relacao', 'data_entrada', 'situacao', 'origem_informacao'];
-  const rows = links.map((l) => {
+  return links.map((l) => {
     const s = byId.get(nid(l.source));
     const t = byId.get(nid(l.target));
     return [
-      esc(s?.label ?? nid(l.source)),
-      esc(s?.kind === 'company' ? 'empresa' : 'pessoa'),
-      esc(t?.label ?? nid(l.target)),
-      esc(t?.kind === 'company' ? 'empresa' : 'pessoa'),
-      esc(RELATION_LABELS[l.type]),
-      esc(l.meta.dataEntrada ?? ''),
-      esc(l.meta.situacao ?? ''),
-      esc(l.meta.origem ?? ''),
-    ].join(';');
+      s?.label ?? nid(l.source),
+      s?.kind === 'company' ? 'empresa' : 'pessoa',
+      t?.label ?? nid(l.target),
+      t?.kind === 'company' ? 'empresa' : 'pessoa',
+      RELATION_LABELS[l.type],
+      l.meta.dataEntrada ?? '',
+      l.meta.situacao ?? '',
+      l.meta.origem ?? '',
+      (l.meta.relations ?? [l.type]).map((r) => RELATION_LABELS[r]).join(' | '),
+      (l.meta.qualificacoes ?? []).join(' | '),
+      (l.meta.origens ?? []).join(' | '),
+      (l.meta.datasEntrada ?? []).join(' | '),
+    ];
   });
-  downloadBlob(['﻿' + header.join(';'), ...rows].join('\n'), 'text/csv;charset=utf-8', 'conexoes-societarias.csv');
+}
+
+export function exportCsv(nodes: GraphNode[], links: GraphLink[]) {
+  const rows = buildCsvRows(nodes, links).map((row) => row.map(csvEscape).join(';'));
+  downloadBlob(['﻿' + CSV_HEADER.join(';'), ...rows].join('\n'), 'text/csv;charset=utf-8', 'conexoes-societarias.csv');
 }
