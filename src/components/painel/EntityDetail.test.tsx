@@ -34,7 +34,7 @@ const PROFILE: ApiFullProfile = {
     parentes: [
       { grau: 'Filho', nome: 'MARIA LUZIMAR', cpfParente: PARENTE_CPF, idade: 26, renda: 'R$ 1.621,00', cidade: 'Maceió', uf: 'AL', profissao: 'Continuo' },
     ],
-    telefones: [{ telefone: '(82) 996302401', flagWhatsApp: false, classificacao: 'A', data: '19/01/2025' }],
+    telefones: [{ ddd: '82', tel: '996302401', telefone: '(82) 996302401', flagWhatsApp: false, classificacao: 'A', data: '19/01/2025', prioridade: 7 }],
     sociedades: [
       { razao_social: 'WRV LTDA', cnpj: '21819440000145', qualificacao_socio_descricao: 'Sócio-Administrador', situacao_cadastral: 'ATIVA', dt_entrada: '09/03/2021' },
     ],
@@ -154,6 +154,19 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
     expect(screen.getByText('Sociedades (empresas)')).toBeInTheDocument();
     // "WRV" fica destacado (quebrado por <mark>); confere um campo não destacado do mesmo registro
     expect(screen.getByText('Sócio-Administrador')).toBeInTheDocument();
+  });
+
+  it('não omite nenhum campo — mostra também os campos fora do conjunto curado', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Contatos & Endereços/ }));
+    // "prioridade" e "ddd" não estão nos campos curados de telefone, mas aparecem mesmo assim
+    expect(screen.getByText('Prioridade')).toBeInTheDocument();
+    expect(screen.getByText('Ddd')).toBeInTheDocument();
+  });
+
+  it('cards de parente trazem a tag de vínculo (Filho/Sócio/…)', () => {
+    render(<EntityDetail />);
+    expect(screen.getByText('Filho')).toBeInTheDocument();
   });
 
   it('clicar em "Consultar" num parente dispara uma nova consulta', () => {

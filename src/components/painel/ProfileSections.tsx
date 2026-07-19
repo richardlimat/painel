@@ -4,8 +4,13 @@ import { isValidCPF, formatCPF } from '../../lib/format';
 import { isSafeHttpUrl } from '../../lib/url';
 import { stripHtmlTags, humanizeKey } from '../../lib/profileRender';
 import { fmtDate, fmtIdade, fmtLocalidade, fmtMoney, fmtText, getPath, isEmptyValue } from '../../lib/profileFormat';
-import type { FieldSpec, SectionSpec } from '../../lib/profileSchema';
-import { MaskedValue, ProfileValueBlock, highlightMatch } from './ProfileValue';
+import {
+  coveredKeysForFields,
+  coveredKeysForSource,
+  type FieldSpec,
+  type SectionSpec,
+} from '../../lib/profileSchema';
+import { MaskedValue, ProfileCardEntries, ProfileValueBlock, highlightMatch } from './ProfileValue';
 import { PersonIcon } from '../flow/icons';
 
 const lastSegment = (path: string) => path.split('.').pop() ?? path;
@@ -33,19 +38,56 @@ function FieldCard({ field, source, query }: { field: FieldSpec; source: unknown
   );
 }
 
-/** Grade de campos rotulados a partir de um único objeto (kind 'fields'). */
-function FieldsGrid({ source, fields, query }: { source: unknown; fields: FieldSpec[]; query: string }) {
+/** Entradas [chave, valor] de um objeto ainda não cobertas por campos curados. */
+function remainingEntries(obj: unknown, covered: Set<string>): [string, unknown][] {
+  if (!obj || typeof obj !== 'object' || Array.isArray(obj)) return [];
+  return Object.entries(obj as Record<string, unknown>).filter(([k]) => !covered.has(k));
+}
+
+/**
+ * Grade de campos rotulados a partir de um único objeto (kind 'fields'). Quando
+ * `covered` é passado (seções com `absorbRest`), anexa ao fim TODA chave da
+ * origem ainda não coberta — nada é omitido.
+ */
+function FieldsGrid({
+  source,
+  fields,
+  query,
+  covered,
+  onOpenImage,
+}: {
+  source: unknown;
+  fields: FieldSpec[];
+  query: string;
+  covered?: Set<string>;
+  onOpenImage: (url: string) => void;
+}) {
+  const rest = covered ? remainingEntries(source, covered) : [];
   return (
-    <div className="ef-grid">
-      {fields.map((f) => (
-        <FieldCard key={f.label} field={f} source={source} query={query} />
-      ))}
-    </div>
+    <>
+      <div className="ef-grid">
+        {fields.map((f) => (
+          <FieldCard key={f.label} field={f} source={source} query={query} />
+        ))}
+      </div>
+      {rest.length > 0 && <ProfileCardEntries entries={rest} query={query} onOpenImage={onOpenImage} />}
+    </>
   );
 }
 
-/** Lista curada: um "record" por item, só com os campos com valor (kind 'list'). */
-function ListSection({ items, fields, query }: { items: unknown[]; fields: FieldSpec[]; query: string }) {
+/** Lista curada: um "record" por item — campos curados + todo o restante do item (nada omitido). */
+function ListSection({
+  items,
+  fields,
+  query,
+  onOpenImage,
+}: {
+  items: unknown[];
+  fields: FieldSpec[];
+  query: string;
+  onOpenImage: (url: string) => void;
+}) {
+  const covered = coveredKeysForFields(fields);
   return (
     <div className="ef-records">
       {items.map((item, i) => {
@@ -54,14 +96,18 @@ function ListSection({ items, fields, query }: { items: unknown[]; fields: Field
           const formatted = f.format ? f.format(raw) : fmtText(raw);
           return formatted !== '—';
         });
-        if (present.length === 0) return null;
+        const rest = remainingEntries(item, covered);
+        if (present.length === 0 && rest.length === 0) return null;
         return (
           <div className="ef-record" key={i}>
-            <div className="ef-grid">
-              {present.map((f) => (
-                <FieldCard key={f.label} field={f} source={item} query={query} />
-              ))}
-            </div>
+            {present.length > 0 && (
+              <div className="ef-grid">
+                {present.map((f) => (
+                  <FieldCard key={f.label} field={f} source={item} query={query} />
+                ))}
+              </div>
+            )}
+            {rest.length > 0 && <ProfileCardEntries entries={rest} query={query} onOpenImage={onOpenImage} />}
           </div>
         );
       })}
@@ -78,6 +124,20 @@ const FLAG_LABELS: Record<string, string> = {
   OBITO: 'Óbito',
   INDICATIVO_CRIMINAL: 'Indicativo criminal',
 };
+
+/** Chaves de pessoa já exibidas no cabeçalho/atributos do card (não repetir no "restante"). */
+const PEOPLE_SHOWN_KEYS = new Set([
+  'nome', 'grau', 'relacao', 'vinculo', 'cpf', 'cpfParente', 'cpf_genitor', 'foto', 'idade',
+  'dataNasc', 'dataNascimento', 'renda', 'cidade', 'uf', 'profissao', 'flag',
+]);
+
+/** Classe de cor da tag de vínculo por tipo (família x sociedade x endereço). */
+function relationClass(grau: string): string {
+  const g = grau.toLowerCase();
+  if (g.includes('soc')) return 'socio';
+  if (g.includes('endere')) return 'endereco';
+  return 'familia';
+}
 
 /** Cards de pessoas relacionadas (parentes, relacionados por endereço, genitores). */
 function PeopleSection({
@@ -109,6 +169,9 @@ function PeopleSection({
         const flags = Array.isArray(item.flag) ? (item.flag as string[]) : [];
         const localidade = fmtLocalidade(cidade, uf);
         const canConsult = isValidCPF(cpf);
+        // Tag de vínculo: usa grau/relacao/vinculo; sem isso, marca "Mesmo endereço" quando aplicável.
+        const relationTag = !isEmptyValue(grau) ? fmtText(grau) : !isEmptyValue(item.endereco) ? 'Mesmo endereço' : '';
+        const rest = remainingEntries(item, PEOPLE_SHOWN_KEYS);
 
         const attrs: { label: string; value: string; maskKey?: string }[] = [
           { label: 'CPF', value: canConsult ? formatCPF(cpf) : fmtText(cpfRaw), maskKey: 'cpf' },
@@ -134,7 +197,7 @@ function PeopleSection({
               <div className="ef-person-title">
                 <strong>{highlightMatch(fmtText(nome), query)}</strong>
                 <div className="ef-person-badges">
-                  {!isEmptyValue(grau) && <span className="ef-relation">{fmtText(grau)}</span>}
+                  {relationTag && <span className={`ef-relation ${relationClass(relationTag)}`}>{relationTag}</span>}
                   {flags.map((f) => (
                     <span className="ef-flag" key={f}>
                       {FLAG_LABELS[f] ?? f}
@@ -162,6 +225,7 @@ function PeopleSection({
                 </div>
               ))}
             </div>
+            {rest.length > 0 && <ProfileCardEntries entries={rest} query={query} onOpenImage={onOpenImage} />}
           </div>
         );
       })}
@@ -187,7 +251,12 @@ function LeaksSection({ items, query }: { items: unknown[]; query: string }) {
                 const res = (r ?? {}) as Record<string, unknown>;
                 return (
                   <div className="ef-leak" key={j}>
-                    <span className="ef-leak-host">{fmtText(res.host ?? res.url)}</span>
+                    <span className="ef-leak-host">
+                      {fmtText(res.host ?? res.url)}
+                      {!isEmptyValue(res.url) && res.url !== res.host && (
+                        <small className="ef-leak-url">{fmtText(res.url)}</small>
+                      )}
+                    </span>
                     <span className="ef-leak-login">
                       <MaskedValue value={fmtText(res.login)} cls="soft" />
                     </span>
@@ -228,15 +297,28 @@ function TimelineSection({ items, query }: { items: unknown[]; query: string }) 
       {sorted.map((raw, i) => {
         const ev = (raw ?? {}) as Record<string, unknown>;
         const categoria = String(ev.categoria ?? '');
+        const meta = Array.isArray(ev.metadata) ? (ev.metadata as Record<string, unknown>[]) : [];
         return (
           <div className="ef-timeline-item" key={i}>
             <span className={`ef-timeline-dot ${TL_CATEGORY_CLASS[categoria] ?? ''}`} />
             <time className="ef-timeline-date">{fmtDate(ev.data)}</time>
             <div className="ef-timeline-body">
-              {categoria && <span className="ef-timeline-cat">{categoria}</span>}
+              <span className="ef-timeline-cat">
+                {categoria}
+                {!isEmptyValue(ev.idade) && ` · ${fmtIdade(ev.idade)}`}
+              </span>
               <span className="ef-timeline-desc">
                 {highlightMatch(stripHtmlTags(fmtText(ev.descricao)), query)}
               </span>
+              {meta.length > 0 && (
+                <div className="ef-timeline-meta">
+                  {meta.map((m, k) => (
+                    <span className="ef-chip" key={k}>
+                      {fmtText(m.descricao ?? m.chave)}: {highlightMatch(fmtText(m.valor), query)}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -245,40 +327,59 @@ function TimelineSection({ items, query }: { items: unknown[]; query: string }) 
   );
 }
 
-/** Propensões de consumo: mostra como chips só os interesses ativos (valor truthy). */
+/**
+ * Propensões de consumo: mostra TODAS as flags (nada omitido) — as ativas em
+ * chips destacados e as inativas em chips apagados — além de CPF/CSB8/faixa.
+ */
 function FlagsSection({ data, query }: { data: Record<string, unknown>; query: string }) {
   const skip = new Set(['cpf', 'csb8', 'csb8_faixa']);
-  const active = Object.entries(data)
-    .filter(([k, v]) => !skip.has(k) && (v === 1 || v === true))
-    .map(([k]) => humanizeKey(k));
+  const flags = Object.entries(data).filter(([k, v]) => !skip.has(k) && (v === 0 || v === 1 || typeof v === 'boolean'));
+  const active = flags.filter(([, v]) => v === 1 || v === true).map(([k]) => humanizeKey(k));
+  const inactive = flags.filter(([, v]) => v === 0 || v === false).map(([k]) => humanizeKey(k));
+
   return (
     <>
-      {(data.csb8_faixa != null || data.csb8 != null) && (
-        <div className="ef-grid">
-          {data.csb8_faixa != null && (
-            <div className="ef-card">
-              <span className="ef-card-label">Faixa de poder de compra</span>
-              <div className="ef-card-value">{fmtText(data.csb8_faixa)}</div>
+      <div className="ef-grid">
+        {data.csb8_faixa != null && (
+          <div className="ef-card">
+            <span className="ef-card-label">Faixa de poder de compra</span>
+            <div className="ef-card-value">{fmtText(data.csb8_faixa)}</div>
+          </div>
+        )}
+        {data.csb8 != null && (
+          <div className="ef-card">
+            <span className="ef-card-label">Índice CSB8</span>
+            <div className="ef-card-value">{fmtText(data.csb8)}</div>
+          </div>
+        )}
+        {data.cpf != null && (
+          <div className="ef-card">
+            <span className="ef-card-label">CPF</span>
+            <div className="ef-card-value">
+              <MaskedValue value={fmtText(data.cpf)} cls="soft" />
             </div>
-          )}
-          {data.csb8 != null && (
-            <div className="ef-card">
-              <span className="ef-card-label">Índice CSB8</span>
-              <div className="ef-card-value">{fmtText(data.csb8)}</div>
-            </div>
-          )}
-        </div>
+          </div>
+        )}
+      </div>
+      {active.length > 0 && (
+        <>
+          <h4 className="ef-group-title" style={{ marginTop: 14 }}>Tem propensão<span className="ef-count">{active.length}</span></h4>
+          <div className="ef-chips">
+            {active.map((label) => (
+              <span className="ef-chip" key={label}>{highlightMatch(label, query)}</span>
+            ))}
+          </div>
+        </>
       )}
-      {active.length > 0 ? (
-        <div className="ef-chips" style={{ marginTop: 12 }}>
-          {active.map((label) => (
-            <span className="ef-chip" key={label}>
-              {highlightMatch(label, query)}
-            </span>
-          ))}
-        </div>
-      ) : (
-        <p className="ef-empty">Nenhuma propensão de consumo ativa.</p>
+      {inactive.length > 0 && (
+        <>
+          <h4 className="ef-group-title" style={{ marginTop: 14 }}>Sem propensão<span className="ef-count">{inactive.length}</span></h4>
+          <div className="ef-chips">
+            {inactive.map((label) => (
+              <span className="ef-chip ef-chip-off" key={label}>{highlightMatch(label, query)}</span>
+            ))}
+          </div>
+        </>
       )}
     </>
   );
@@ -323,9 +424,17 @@ export function ProfileSectionView({
   if (empty) {
     body = <p className="ef-empty">{spec.emptyText ?? 'Nenhum registro encontrado.'}</p>;
   } else if (spec.kind === 'fields') {
-    body = <FieldsGrid source={val} fields={spec.fields ?? []} query={query} />;
+    body = (
+      <FieldsGrid
+        source={val}
+        fields={spec.fields ?? []}
+        query={query}
+        covered={spec.absorbRest ? coveredKeysForSource(spec.source) : undefined}
+        onOpenImage={onOpenImage}
+      />
+    );
   } else if (spec.kind === 'list') {
-    body = <ListSection items={val as unknown[]} fields={spec.fields ?? []} query={query} />;
+    body = <ListSection items={val as unknown[]} fields={spec.fields ?? []} query={query} onOpenImage={onOpenImage} />;
   } else if (spec.kind === 'people') {
     body = <PeopleSection items={val as unknown[]} query={query} onOpenImage={onOpenImage} onConsult={onConsult} />;
   } else if (spec.kind === 'leaks') {

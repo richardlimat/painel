@@ -31,6 +31,8 @@ export interface FieldSpec {
   format?: (value: unknown) => string;
   /** Chave usada para decidir mascaramento (default: último segmento de `path`). */
   maskKey?: string;
+  /** Chaves cruas consumidas por este campo (além do topo de `path`) — evita duplicá-las no "restante". */
+  consumes?: string[];
 }
 
 export interface SectionSpec {
@@ -43,6 +45,12 @@ export interface SectionSpec {
   /** Renderiza mesmo quando a origem está vazia (mostra `emptyText`). */
   alwaysShow?: boolean;
   emptyText?: string;
+  /**
+   * Numa seção 'fields', anexa ao fim TODAS as chaves da origem ainda não
+   * cobertas por nenhum campo (desta ou de seções irmãs que leem a mesma
+   * origem) — garante que nenhum dado seja omitido.
+   */
+  absorbRest?: boolean;
 }
 
 export interface PageSpec {
@@ -53,7 +61,7 @@ export interface PageSpec {
 const CADASTRAL_FIELDS: FieldSpec[] = [
   { label: 'Nome completo', path: 'nome' },
   { label: 'Nome social', path: 'nomeSocial' },
-  { label: 'CPF', path: 'cpfMask', maskKey: 'cpf' },
+  { label: 'CPF', path: 'cpfMask', maskKey: 'cpf', consumes: ['cpf'] },
   { label: 'Data de nascimento', path: 'dataNasc', format: fmtDate },
   { label: 'Idade', path: 'idade', format: fmtIdade },
   { label: 'Sexo', path: 'sexo', format: fmtSexo },
@@ -64,7 +72,6 @@ const CADASTRAL_FIELDS: FieldSpec[] = [
   { label: 'Subclasse social', path: 'subClasseSocial' },
   { label: 'Nível escolar', path: 'escolaridade' },
   { label: 'Renda estimada', path: 'renda', format: fmtMoney },
-  { label: 'Poder aquisitivo', path: 'poderAquisitivo.poder' },
   { label: 'Nome do pai', path: 'pai.nome', maskKey: '_' },
   { label: 'Nome da mãe', path: 'mae.nome', maskKey: '_' },
   { label: 'NIS', path: 'nis', maskKey: 'nis' },
@@ -108,10 +115,10 @@ export const PROFILE_PAGES: PageSpec[] = [
   {
     name: 'Cadastral & Civil',
     sections: [
-      { title: 'Dados de Registro Civil & RFB', source: 'cadastral', kind: 'fields', fields: CADASTRAL_FIELDS, alwaysShow: true, emptyText: 'Sem dados cadastrais para este CPF.' },
+      { title: 'Dados de Registro Civil & RFB', source: 'cadastral', kind: 'fields', fields: CADASTRAL_FIELDS, alwaysShow: true, absorbRest: true, emptyText: 'Sem dados cadastrais para este CPF.' },
       { title: 'Título de Eleitor', source: 'cadastral', kind: 'fields', fields: TITULO_ELEITOR_FIELDS, alwaysShow: true },
       { title: 'Carteira de Identidade Nacional (CIN)', source: 'cin', kind: 'generic', alwaysShow: true, emptyText: 'Sem dados de CIN disponíveis para este CPF.' },
-      { title: 'Dados de Habilitação (CNH)', source: 'cnh', kind: 'fields', fields: CNH_FIELDS, alwaysShow: true, emptyText: 'Sem dados de habilitação vinculados.' },
+      { title: 'Dados de Habilitação (CNH)', source: 'cnh', kind: 'fields', fields: CNH_FIELDS, alwaysShow: true, absorbRest: true, emptyText: 'Sem dados de habilitação vinculados.' },
       { title: 'Registros de RG', source: 'rgs', kind: 'list', fields: [
         { label: 'RG', path: 'rg', maskKey: 'rg' },
         { label: 'Órgão', path: 'orgaorg' },
@@ -153,7 +160,7 @@ export const PROFILE_PAGES: PageSpec[] = [
         { label: 'Número', path: 'numero' },
         { label: 'Complemento', path: 'complemento' },
         { label: 'Bairro', path: 'bairro' },
-        { label: 'Cidade / UF', path: '', format: cidadeUf('cidade', 'uf'), maskKey: '_' },
+        { label: 'Cidade / UF', path: '', format: cidadeUf('cidade', 'uf'), maskKey: '_', consumes: ['cidade', 'uf'] },
         { label: 'CEP', path: 'cep' },
         { label: 'Fonte', path: 'fonte' },
         { label: 'Atualizado em', path: 'dataInformacao', format: fmtDate },
@@ -231,7 +238,7 @@ export const PROFILE_PAGES: PageSpec[] = [
         { label: 'CNPJ', path: 'cnpj' },
         { label: 'E-mail', path: 'email', maskKey: 'email' },
         { label: 'Telefones', path: 'telefones', maskKey: 'telefone' },
-        { label: 'Endereço', path: '', format: (i) => fmtLocalidadeFromContato(i), maskKey: '_' },
+        { label: 'Endereço', path: '', format: (i) => fmtLocalidadeFromContato(i), maskKey: '_', consumes: ['endereco'] },
       ] },
       { title: 'Empresas relacionadas', source: 'empresasRelacionadas', kind: 'generic' },
       { title: 'MEI', source: 'meiDetalhado', kind: 'generic' },
@@ -275,7 +282,7 @@ export const PROFILE_PAGES: PageSpec[] = [
         { label: 'Fabricante', path: 'vacina_fabricante' },
         { label: 'Aplicação', path: 'vacina_dt_aplicacao', format: fmtDate },
         { label: 'Estabelecimento', path: 'estab_nome_fantasia' },
-        { label: 'Município / UF', path: '', format: cidadeUf('estab_municipio', 'estab_uf'), maskKey: '_' },
+        { label: 'Município / UF', path: '', format: cidadeUf('estab_municipio', 'estab_uf'), maskKey: '_', consumes: ['estab_municipio', 'estab_uf'] },
       ] },
       { title: 'Planos de saúde', source: 'planosSaude', kind: 'generic' },
       { title: 'INSS / SIAPE', source: 'inssSiape', kind: 'generic' },
@@ -300,6 +307,37 @@ function fmtLocalidadeFromContato(item: unknown): string {
 }
 
 export const PROFILE_PAGE_NAMES: string[] = PROFILE_PAGES.map((p) => p.name);
+
+const fieldCoveredKeys = (f: FieldSpec): string[] => {
+  const keys = f.consumes ? [...f.consumes] : [];
+  const top = f.path.split('.')[0];
+  if (top) keys.push(top);
+  return keys;
+};
+
+/**
+ * Chaves cruas da `source` já cobertas por algum campo curado (somando TODAS
+ * as seções que leem a mesma origem — ex.: cadastral é lido pela seção de
+ * Registro Civil e pela de Título de Eleitor). Usado por `absorbRest` para
+ * anexar só o que sobrou, sem duplicar.
+ */
+export function coveredKeysForSource(source: string): Set<string> {
+  const set = new Set<string>();
+  for (const page of PROFILE_PAGES) {
+    for (const sec of page.sections) {
+      if (sec.source !== source || !sec.fields) continue;
+      for (const f of sec.fields) for (const k of fieldCoveredKeys(f)) set.add(k);
+    }
+  }
+  return set;
+}
+
+/** Chaves cruas cobertas pelos campos de UMA seção (para listas, que não compartilham origem). */
+export function coveredKeysForFields(fields: FieldSpec[] | undefined): Set<string> {
+  const set = new Set<string>();
+  for (const f of fields ?? []) for (const k of fieldCoveredKeys(f)) set.add(k);
+  return set;
+}
 
 /** Todas as chaves de nível superior referenciadas por alguma seção. */
 export function collectUsedSources(): Set<string> {
