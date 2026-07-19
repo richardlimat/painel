@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyMask, classifyKey } from './mask';
+import { applyMask, classifyKey, stripHardFields } from './mask';
 
 describe('classifyKey', () => {
   it('classifica campos sensíveis (soft) mesmo com camelCase/snake_case', () => {
@@ -11,6 +11,21 @@ describe('classifyKey', () => {
     expect(classifyKey('email')).toBe('soft');
     expect(classifyKey('endereco')).toBe('soft');
     expect(classifyKey('chavePix')).toBe('soft');
+    expect(classifyKey('contaBancaria')).toBe('soft');
+    expect(classifyKey('agenciaBancaria')).toBe('soft');
+  });
+
+  it('classifica nome dos pais como soft (revelável), sem falso positivo em palavras parecidas', () => {
+    expect(classifyKey('nomeMae')).toBe('soft');
+    expect(classifyKey('nome_pai')).toBe('soft');
+    expect(classifyKey('filiacaoMae')).toBe('soft');
+    expect(classifyKey('paisagem')).toBe('none'); // não deve casar com "pai" (sem fronteira de palavra)
+  });
+
+  it('classifica identificador/login de vazamento como soft — a credencial em si continua hard', () => {
+    expect(classifyKey('loginVazado')).toBe('soft');
+    expect(classifyKey('identificadorVazado')).toBe('soft');
+    expect(classifyKey('credenciaisVazadas')).toBe('hard'); // objeto pai continua hard (contém senha/hash)
   });
 
   it('classifica credenciais/segredos como hard mesmo em plural pt-BR', () => {
@@ -22,6 +37,14 @@ describe('classifyKey', () => {
     expect(classifyKey('sessionCookie')).toBe('hard');
     expect(classifyKey('apiSecret')).toBe('hard');
     expect(classifyKey('autorizacao')).toBe('hard');
+  });
+
+  it('classifica chave de API e código de sessão como hard, sem afetar chave Pix (dado bancário)', () => {
+    expect(classifyKey('apiKey')).toBe('hard');
+    expect(classifyKey('secretKey')).toBe('hard');
+    expect(classifyKey('codigoSessao')).toBe('hard');
+    expect(classifyKey('sessionId')).toBe('hard');
+    expect(classifyKey('chavePix')).toBe('soft'); // dado bancário, não segredo — não pode virar hard
   });
 
   it('não gera falso positivo em palavras que contêm substrings parecidas', () => {
@@ -52,5 +75,36 @@ describe('applyMask', () => {
 
   it('não mascara "none"', () => {
     expect(applyMask('EMPRESA TESTE LTDA', 'none', false)).toBe('EMPRESA TESTE LTDA');
+  });
+});
+
+describe('stripHardFields', () => {
+  it('remove campos hard em qualquer profundidade, preservando os demais', () => {
+    const input = {
+      nome: 'FULANO',
+      cpf: '11144477735',
+      credenciaisVazadas: [{ senha: 'segredo123', origem: 'vazamento X' }],
+      auth: { apiKey: 'abc123', sessionCookie: 'xyz', publico: 'ok' },
+    };
+    const result = stripHardFields(input) as typeof input;
+    expect(result.nome).toBe('FULANO');
+    expect(result.cpf).toBe('11144477735');
+    expect((result as Record<string, unknown>).credenciaisVazadas).toBeUndefined();
+    expect((result.auth as Record<string, unknown>).apiKey).toBeUndefined();
+    expect((result.auth as Record<string, unknown>).sessionCookie).toBeUndefined();
+    expect((result.auth as Record<string, unknown>).publico).toBe('ok');
+  });
+
+  it('percorre arrays recursivamente', () => {
+    const input = [{ token: 'abc', nome: 'A' }, { token: 'def', nome: 'B' }];
+    const result = stripHardFields(input) as Record<string, unknown>[];
+    expect(result.every((item) => !('token' in item))).toBe(true);
+    expect(result.map((item) => item.nome)).toEqual(['A', 'B']);
+  });
+
+  it('não altera valores escalares', () => {
+    expect(stripHardFields('texto')).toBe('texto');
+    expect(stripHardFields(42)).toBe(42);
+    expect(stripHardFields(null)).toBeNull();
   });
 });

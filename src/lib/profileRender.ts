@@ -7,12 +7,25 @@
  */
 
 import { formatCurrency, formatDate } from './format';
+import { isSafeHttpUrl } from './url';
 
 export const MAX_RENDER_DEPTH = 6;
 export const MAX_RENDER_ITEMS = 50;
 
 const BASE64_CHARSET_RE = /^[A-Za-z0-9+/]+={0,2}$/;
 const DOCUMENT_KEY_HINT_RE = /(base64|docsbase64|foto|imagem|imagembase64|documento|pdf|anexo)/;
+const IMAGE_EXT_RE = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i;
+const IMAGE_KEY_HINT_RE = /(foto|imagem|selfie|fotografia|avatar|picture|photo)/;
+
+/**
+ * URL (http/https apenas — `javascript:`/`data:`/`file:` nunca passam aqui,
+ * ver `isSafeHttpUrl`) que deve virar miniatura clicável em vez de texto.
+ */
+export function isLikelyImageUrl(key: string, value: unknown): boolean {
+  if (!isSafeHttpUrl(value)) return false;
+  if (IMAGE_EXT_RE.test(value)) return true;
+  return IMAGE_KEY_HINT_RE.test(key.toLowerCase());
+}
 
 /**
  * Detecta conteúdo que não deve ser renderizado como texto cru (Base64 de

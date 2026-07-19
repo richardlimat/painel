@@ -1,19 +1,16 @@
 import { isValidCPF, onlyDigits } from '../src/lib/format';
+import { requireSession } from './_lib/auth';
 
 export const config = { runtime: 'edge' };
 
 /**
- * ⚠️ SEGURANÇA: esta rota é pública. O projeto não tem autenticação (sem
- * login/sessão/middleware em lugar nenhum do repositório). Qualquer pessoa
- * que descubra a URL do deployment pode chamar este endpoint e consumir
- * créditos pagos da APIFull. Isso é uma decisão consciente da primeira
- * versão, não uma configuração pendente — ver README para o aviso completo
- * e a recomendação de ativar Vercel Deployment Protection antes de uso real.
+ * Protegida por sessão (ver api/_lib/auth.ts) — exige cookie de sessão
+ * válido antes de consumir créditos pagos da APIFull.
  *
- * Também não há rate-limit nem controle de concorrência no servidor (exige
- * KV/Redis, que este projeto não tem) — a única mitigação hoje é client-side
+ * Não há rate-limit nem controle de concorrência no servidor (exige
+ * KV/Redis, que este projeto não tem) — a mitigação adicional é client-side
  * (cache por CPF, lotes com concorrência limitada, confirmação antes de
- * cascatas grandes). Ver plano/README.
+ * cascatas grandes). Ver README.
  */
 
 const MAX_BODY_BYTES = 2048; // {"cpf":"...","link":"cpf-ultra"} nunca chega perto disso
@@ -56,6 +53,9 @@ export default async function handler(req: Request): Promise<Response> {
   if (req.method !== 'POST') {
     return jsonResponse({ code: 'method_not_allowed', message: 'Use POST.' }, 405);
   }
+
+  const auth = await requireSession(req);
+  if (!auth.ok) return auth.response;
 
   const contentLength = Number(req.headers.get('content-length') ?? '0');
   if (contentLength > MAX_BODY_BYTES) {

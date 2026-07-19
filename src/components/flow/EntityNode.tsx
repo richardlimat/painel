@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Handle, Position, type NodeProps, type Node } from '@xyflow/react';
 import { CompanyIcon, PersonIcon } from './icons';
 
@@ -12,6 +12,8 @@ export interface EntityNodeData extends Record<string, unknown> {
   subLabel?: string;
   idLabel?: string;
   role?: string;
+  /** URL http(s) da foto da pessoa (já validada) — nunca usado em nó de empresa. */
+  photoUrl?: string;
   main?: boolean;
   expanded: boolean;
   expanding: boolean;
@@ -28,6 +30,11 @@ export const EntityNode = memo(({ data, selected }: NodeProps<EntityFlowNode>) =
     '--rf-size': `${size}px`,
   } as React.CSSProperties;
 
+  const [photoFailed, setPhotoFailed] = useState(false);
+  // se a URL da foto mudar (ex.: perfil recarregado), dá uma nova chance antes de cair no ícone
+  useEffect(() => setPhotoFailed(false), [data.photoUrl]);
+  const showPhoto = data.isPerson && Boolean(data.photoUrl) && !photoFailed;
+
   return (
     <div
       className={`rf-entity ${data.kind} ${selected || data.highlighted ? 'is-selected' : ''}`}
@@ -36,7 +43,19 @@ export const EntityNode = memo(({ data, selected }: NodeProps<EntityFlowNode>) =
       <Handle type="target" id="t" position={Position.Top} className="rf-port" isConnectable={false} />
       <Handle type="source" id="s" position={Position.Top} className="rf-port" isConnectable={false} />
       <div className="rf-circle" style={{ background: data.color, borderColor: data.ring ?? data.color }}>
-        {data.isPerson ? <PersonIcon /> : <CompanyIcon />}
+        {showPhoto ? (
+          <img
+            src={data.photoUrl}
+            alt=""
+            className="rf-avatar"
+            loading="lazy"
+            onError={() => setPhotoFailed(true)}
+          />
+        ) : data.isPerson ? (
+          <PersonIcon />
+        ) : (
+          <CompanyIcon />
+        )}
         {!data.expanded && !data.expanding && <span className="rf-expand">+</span>}
         {data.expanding && <span className="rf-loading" />}
       </div>

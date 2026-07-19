@@ -92,41 +92,45 @@ que faltou (o perfil já em cache não é rebuscado).
 
 ### ⚠️ Aviso de segurança — leia antes de configurar em produção
 
-**Nem `/api/cadastro-pj-plus` nem `/api/cpf-ultra` têm controle de acesso.**
-Este projeto não tem autenticação (sem login, sessão ou middleware em lugar
-nenhum do código) — isso é uma decisão consciente da primeira versão, não
-uma configuração pendente. Qualquer pessoa que descubra a URL do deployment
-pode chamar essas rotas e consumir créditos pagos das duas APIs.
+**`/api/cadastro-pj-plus`, `/api/cpf-ultra` e `/api/saved-queries/*` exigem
+sessão autenticada** (cookie `HttpOnly`/`SameSite=Lax`, `Secure` em
+produção — ver `api/_lib/auth.ts`). Login e sessão são tabelas próprias no
+Supabase (`users`/`sessions`, ver `supabase/migrations/`), **não** Supabase
+Auth. Não há cadastro público nesta versão — crie o primeiro usuário com
+`scripts/create-user.ts` (ver seção "Criando o primeiro usuário" abaixo).
 
 **O mascaramento de campos sensíveis no painel (CPF, RG, contas, Pix etc.,
-com botão "Revelar") não é controle de acesso — é só conveniência de UI.**
-Qualquer pessoa com acesso ao painel pode clicar em "Revelar". O JSON
-completo da resposta já está visível na aba Network do navegador, e a rota
-`/api/cpf-ultra` pode ser chamada diretamente (`curl`, Postman etc.) sem
-passar pela interface. Só os campos "duros" (senhas, hashes, tokens de
-`credenciaisVazadas`) nunca são exibidos, sob nenhuma circunstância — essa
-é a única proteção real de conteúdo que existe hoje.
+com botão "Revelar") não é a única camada de proteção — é conveniência de
+UI que complementa a exigência de sessão.** Só os campos "duros" (senhas,
+hashes, tokens, chaves de API, códigos de sessão) nunca são exibidos, sob
+nenhuma circunstância, e nunca são persistidos numa consulta salva.
 
-**Antes de configurar `APIFULL_AUTHORIZATION`/`FONTEDATA_API_KEY` num
-ambiente acessível pela internet**, ative pelo menos o
-[Vercel Deployment Protection](https://vercel.com/docs/deployment-protection)
-(senha nativa da Vercel para o deployment inteiro). Sem isso, uma rota paga
-de consulta de CPF fica completamente aberta na internet.
-
-Também não há rate-limit nem controle de concorrência no servidor (exigiria
-KV/Redis, que este projeto não tem) — a única mitigação hoje é client-side:
+Não há rate-limit nem controle de concorrência no servidor (exigiria
+KV/Redis, que este projeto não tem) — a mitigação adicional é client-side:
 cache por CPF/CNPJ, lotes com concorrência limitada, e uma confirmação antes
 de "Expandir Tudo" iniciar uma cascata grande de consultas pagas.
 
 ## Rodando
 
 ```bash
-cp .env.example .env   # preencha FONTEDATA_API_KEY e APIFULL_AUTHORIZATION
+cp .env.example .env   # preencha FONTEDATA_API_KEY, APIFULL_AUTHORIZATION, SUPABASE_URL, SUPABASE_SECRET_KEY
 npm install
 npm run dev        # http://localhost:5173 — só a UI; /api/* não é servido (ver abaixo)
 npm run build      # produção em dist/
 npm run preview
-npm run test       # Vitest (normalização, URLs, cache, camadas, dedup, mascaramento)
+npm run test       # Vitest (normalização, URLs, cache, camadas, dedup, mascaramento, auth)
+```
+
+### Criando o primeiro usuário
+
+Não há cadastro público — o primeiro usuário é criado por um script
+administrativo que roda fora do Edge Runtime, com `SUPABASE_URL`/
+`SUPABASE_SECRET_KEY` no ambiente:
+
+```bash
+npx tsx scripts/create-user.ts --email admin@example.com --nome "Admin"
+# a senha é pedida em seguida, de forma oculta (sem eco no terminal) —
+# nunca passe --password/--senha na linha de comando.
 ```
 
 `npm run dev`/`npm run preview` sozinhos **não** servem `/api/*` (Vite não
@@ -143,29 +147,56 @@ Preview/Produção da Vercel com as variáveis configuradas naquele ambiente —
 
 ```
 api/
-├── cadastro-pj-plus.ts     # Vercel Edge Function: proxy same-origin p/ FonteData
-└── cpf-ultra.ts            # Vercel Edge Function: proxy same-origin p/ APIFull (rota pública, ver aviso)
+├── _lib/                   # helpers server-only (nunca importados pelo client)
+│   ├── supabase.ts         # client Supabase (Service Role Key, sempre ignora RLS)
+│   ├── password.ts         # hash PBKDF2 via Web Crypto
+│   ├── session.ts          # token opaco, hash, cookie HttpOnly/SameSite=Lax
+│   ├── auth.ts             # requireSession (protege rotas) + validateOrigin (CSRF)
+│   ├── ssrf.ts             # bloqueio de host privado/loopback ao baixar imagens de terceiro
+│   └── uploads.ts          # sniff de MIME, hash, upload/signed URL no bucket imagens_url
+├── auth/
+│   ├── login.ts            # POST — e-mail/senha contra tabelas próprias (sem Supabase Auth)
+│   ├── logout.ts           # POST — revoga a sessão
+│   └── session.ts          # GET — verificação da sessão atual
+├── saved-queries/
+│   ├── index.ts            # GET lista / POST cria (snapshot + upload de imagens)
+│   └── [id].ts              # GET abre (signed URLs) / DELETE exclui (+ imagens do bucket)
+├── cadastro-pj-plus.ts     # Vercel Edge Function: proxy same-origin p/ FonteData (protegida por sessão)
+└── cpf-ultra.ts            # Vercel Edge Function: proxy same-origin p/ APIFull (protegida por sessão)
+
+supabase/migrations/        # users, sessions, saved_queries, saved_query_images (RLS sem policies)
+
+scripts/create-user.ts      # cria o primeiro usuário (senha só via prompt oculto, nunca em argv/log)
 
 src/
 ├── types/graph.ts          # modelo de grafo: nós Pessoa/Empresa, relacionamentos tipados
 ├── services/
 │   ├── provider.ts         # interface DataProvider (plugável)
 │   ├── fontedata.ts        # provedor real (API comercial FonteData)
-│   └── apifull.ts          # perfil completo + sociedades[] (API comercial APIFull)
+│   ├── apifull.ts          # perfil completo + sociedades[] (API comercial APIFull)
+│   └── savedQueries.ts     # client das rotas /api/saved-queries/*
 ├── store/
-│   ├── graphStore.ts          # Zustand: expansão BFS, camadas, dedupe/anti-loop, filtros, tema
-│   └── personProfileStore.ts  # Zustand: cache/dedup do perfil APIFull por CPF (separado do grafo)
+│   ├── authStore.ts           # Zustand: sessão do usuário (login/logout/checkSession)
+│   ├── graphStore.ts          # Zustand: expansão BFS, camadas, dedupe/anti-loop, filtros, tema,
+│   │                          # snapshot/hidratação de consulta salva, foto do nó de pessoa
+│   └── personProfileStore.ts  # Zustand: fila sequencial + cache/dedup do perfil APIFull por CPF,
+│                              # mecanismo de lote (batch) para sincronizar mapa/camadas com a fila
 ├── lib/
 │   ├── filtering.ts        # filtros dinâmicos + estatísticas + grau dos nós
 │   ├── flowLayout.ts       # layout radial + posicionamento incremental
 │   ├── exporters.ts        # PNG/SVG/PDF/JSON/CSV (nunca inclui o perfil da APIFull)
 │   ├── colors.ts           # identidade visual de nós e conexões (paleta do painel)
 │   ├── format.ts           # CNPJ/CPF/moeda/data
-│   ├── mask.ts             # classificação/mascaramento de campos sensíveis (UI, não é ACL)
-│   └── profileRender.ts    # limites de profundidade/itens + detecção de Base64/documento
+│   ├── mask.ts             # classificação/mascaramento de campos sensíveis + stripHardFields
+│   ├── url.ts              # isSafeHttpUrl (só http/https — bloqueia javascript:/data:/file:)
+│   ├── personPhoto.ts      # extração da foto do perfil APIFull (cadastral.foto > fotos[] > extraFotos[])
+│   ├── profileImages.ts    # coleta de imagens do perfil para upload ao salvar a consulta
+│   └── profileRender.ts    # limites de profundidade/itens + detecção de Base64/documento/URL de imagem
 ├── painel.css              # estrutura visual do painel (grid, painéis, nós rf-entity, perfil)
 └── components/
-    ├── flow/               # FlowCanvas, EntityNode, FloatingEdge (React Flow)
-    └── painel/              # Topbar, FiltersSidebar, Workspace, DetailsPanel,
-                              # PersonProfilePanel, CollapsibleSection
+    ├── LoginForm.tsx, SavedQueriesList.tsx
+    ├── flow/               # FlowCanvas, EntityNode (foto na bolinha da pessoa), FloatingEdge
+    └── painel/              # Topbar (nome do usuário/Sair, Salvar consulta, Consultas salvas),
+                              # FiltersSidebar, Workspace, DetailsPanel, PersonProfilePanel,
+                              # ImageLightbox, SaveQueryButton, CollapsibleSection
 ```

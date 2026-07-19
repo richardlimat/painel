@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { PersonProfilePanel } from './PersonProfilePanel';
 import { DetailsPanel } from './DetailsPanel';
@@ -12,6 +12,20 @@ import type { GraphNode } from '../../types/graph';
 const PERSON_CPF = '11144477735';
 const RAW_SECRET = 'segredo-super-confidencial';
 const RAW_BASE64_DOC = 'A'.repeat(2500); // > 2000 chars — sempre tratado como documento, nunca texto cru
+
+function makeBase64Doc(magicBytes: number[], totalLength = 300): string {
+  const bytes = new Uint8Array(totalLength);
+  magicBytes.forEach((b, i) => {
+    bytes[i] = b;
+  });
+  let binary = '';
+  for (const b of bytes) binary += String.fromCharCode(b);
+  return btoa(binary);
+}
+
+const RAW_BASE64_IMAGE = makeBase64Doc([0x89, 0x50, 0x4e, 0x47]); // magic bytes PNG
+const RAW_BASE64_PDF = makeBase64Doc([0x25, 0x50, 0x44, 0x46]); // magic bytes PDF
+const IMAGE_URL = 'https://cdn.example.com/foto-pessoa.jpg';
 
 const PROFILE: ApiFullProfile = {
   SERVICE_RESPONSE: {
@@ -25,6 +39,10 @@ const PROFILE: ApiFullProfile = {
     docsBase64: RAW_BASE64_DOC,
     linhaDoTempo: [{ descricao: '<b>Entrada</b> na empresa <script>alert(1)</script>' }],
     campoNovoDesconhecido: { valor: 'valorunico12345' },
+    fotoUrl: IMAGE_URL,
+    fotoImagemBase64: RAW_BASE64_IMAGE,
+    documentoPdfBase64: RAW_BASE64_PDF,
+    linkInseguro: 'javascript:alert(1)',
   },
 };
 
@@ -131,6 +149,63 @@ describe('PersonProfilePanel — Etapa 2 (categorias, busca, formatação segura
     openSection(/credenciaisVazadas/);
     expect(container.textContent).not.toContain(RAW_SECRET);
     expect(screen.queryByText('Revelar')).not.toBeInTheDocument();
+  });
+
+  it('24. URL de imagem vira miniatura clicável e abre no lightbox ao clicar (nunca texto cru)', () => {
+    const { container } = render(<PersonProfilePanel node={PERSON_NODE} />);
+    openSection(/Fotos e documentos/);
+    openSection(/fotoUrl/);
+
+    expect(screen.queryByText(IMAGE_URL)).not.toBeInTheDocument();
+    const thumb = screen.getByRole('button', { name: /Ampliar imagem/ });
+    const img = thumb.querySelector('img') as HTMLImageElement;
+    expect(img.src).toBe(IMAGE_URL);
+    expect(container.querySelector('.image-lightbox-overlay')).toBeNull();
+
+    fireEvent.click(thumb);
+    const lightboxImg = container.querySelector('.image-lightbox-overlay img');
+    expect(lightboxImg).toHaveAttribute('src', IMAGE_URL);
+  });
+
+  it('25. esquema inseguro (javascript:) nunca vira src de <img> nem miniatura — só texto', () => {
+    render(<PersonProfilePanel node={PERSON_NODE} />);
+    openSection(/Outros dados/);
+    openSection(/linkInseguro/);
+    expect(screen.getByText('javascript:alert(1)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Ampliar imagem/ })).not.toBeInTheDocument();
+  });
+
+  it('26. Base64 de imagem abre no lightbox ao clicar em "Visualizar" (não em nova aba)', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { container } = render(<PersonProfilePanel node={PERSON_NODE} />);
+    openSection(/Fotos e documentos/);
+    openSection(/fotoImagemBase64/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Visualizar' }));
+
+    expect(openSpy).not.toHaveBeenCalled();
+    expect(container.querySelector('.image-lightbox-overlay img')).toBeInTheDocument();
+    openSpy.mockRestore();
+  });
+
+  it('27. Base64 de PDF mantém abertura em nova aba (não vira lightbox)', () => {
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+    const { container } = render(<PersonProfilePanel node={PERSON_NODE} />);
+    openSection(/Documentos/);
+    openSection(/documentoPdfBase64/);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Visualizar' }));
+
+    expect(openSpy).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('.image-lightbox-overlay')).toBeNull();
+    openSpy.mockRestore();
+  });
+
+  it('28. nenhuma string Base64 aparece como texto cru em nenhum ponto do DOM (imagem ou PDF)', () => {
+    const { container } = render(<PersonProfilePanel node={PERSON_NODE} />);
+    openSection(/Fotos e documentos/);
+    openSection(/fotoImagemBase64/);
+    expect(container.textContent).not.toContain(RAW_BASE64_IMAGE.slice(0, 100));
   });
 });
 

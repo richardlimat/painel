@@ -3,15 +3,33 @@ import { motion } from 'framer-motion';
 import { useGraphStore } from '../store/graphStore';
 import { isValidCNPJ, maskCNPJ, onlyDigits } from '../lib/format';
 
+const PHASE_LABEL: Record<string, string> = {
+  company: 'Consultando empresa…',
+  'company-found': 'Empresa encontrada.',
+  profiles: 'Consultando perfis…',
+  preparing: 'Preparando mapa…',
+};
+
 /** Tela inicial: informa o CNPJ raiz e o limite de camadas */
-export function SearchForm() {
+export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => void }) {
   const startSearch = useGraphStore((s) => s.startSearch);
+  const retryFailedSearchProfiles = useGraphStore((s) => s.retryFailedSearchProfiles);
+  const continueWithAvailableData = useGraphStore((s) => s.continueWithAvailableData);
   const loading = useGraphStore((s) => s.loading);
   const error = useGraphStore((s) => s.error);
+  const searchPhase = useGraphStore((s) => s.searchPhase);
+  const searchProfilesTotal = useGraphStore((s) => s.searchProfilesTotal);
+  const searchProfilesDone = useGraphStore((s) => s.searchProfilesDone);
+  const searchFailedCpfs = useGraphStore((s) => s.searchFailedCpfs);
   const maxDepth = useGraphStore((s) => s.maxDepth);
   const setMaxDepth = useGraphStore((s) => s.setMaxDepth);
   const [cnpj, setCnpj] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  const phaseLabel =
+    searchPhase === 'profiles' && searchProfilesTotal > 0
+      ? `Consultando perfis: ${searchProfilesDone} de ${searchProfilesTotal}`
+      : PHASE_LABEL[searchPhase];
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -87,6 +105,37 @@ export function SearchForm() {
             </p>
           )}
 
+          {loading && phaseLabel && (
+            <p className="rounded-lg bg-slate-50 p-2.5 text-sm text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              {phaseLabel}
+            </p>
+          )}
+
+          {searchPhase === 'awaiting-decision' && (
+            <div className="space-y-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+              <p>
+                {searchFailedCpfs.length} de {searchProfilesTotal} perfil(is) não puderam ser carregados agora. O mapa
+                ainda não foi aberto.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => void retryFailedSearchProfiles()}
+                  className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-amber-700"
+                >
+                  Tentar novamente
+                </button>
+                <button
+                  type="button"
+                  onClick={continueWithAvailableData}
+                  className="rounded-lg border border-amber-300 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-200 dark:hover:bg-amber-900/50"
+                >
+                  Continuar com os dados disponíveis
+                </button>
+              </div>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={loading}
@@ -94,6 +143,16 @@ export function SearchForm() {
           >
             {loading ? 'Consultando…' : 'Mapear estrutura societária'}
           </button>
+
+          {onOpenSavedQueries && (
+            <button
+              type="button"
+              onClick={onOpenSavedQueries}
+              className="w-full text-center text-sm text-slate-500 hover:underline dark:text-slate-400"
+            >
+              Ver consultas salvas
+            </button>
+          )}
         </form>
       </motion.div>
     </div>

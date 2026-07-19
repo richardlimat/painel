@@ -1,15 +1,18 @@
 import { useMemo, useState } from 'react';
 import { useGraphStore } from '../../store/graphStore';
+import { useAuthStore } from '../../store/authStore';
 import { normalizeText, onlyDigits } from '../../lib/format';
 import { exportCsv, exportJson, exportPdf, exportPng, exportSvg } from '../../lib/exporters';
+import { SaveQueryButton } from './SaveQueryButton';
 
 interface Props {
   workspaceRef: React.RefObject<HTMLDivElement>;
   onToggleFilters: () => void;
   onToggleDetails: () => void;
+  onOpenSavedQueries: () => void;
 }
 
-export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props) {
+export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails, onOpenSavedQueries }: Props) {
   const nodes = useGraphStore((s) => s.nodes);
   const links = useGraphStore((s) => s.links);
   const searchQuery = useGraphStore((s) => s.searchQuery);
@@ -23,6 +26,8 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
   const loading = useGraphStore((s) => s.loading);
   const reset = useGraphStore((s) => s.reset);
   const notify = useGraphStore((s) => s.notify);
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
@@ -162,11 +167,26 @@ export function Topbar({ workspaceRef, onToggleFilters, onToggleDetails }: Props
           <svg className="icon" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /></svg>
           <span>Nova consulta</span>
         </button>
-        <div className="avatar">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6b7688" strokeWidth="2">
-            <circle cx="12" cy="8" r="4" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-          </svg>
+        <SaveQueryButton />
+        <button className="btn plain" onClick={onOpenSavedQueries} title="Consultas salvas">
+          <svg className="icon" viewBox="0 0 24 24"><path d="M4 4h16v16H4z" /><path d="M8 4v16M4 9h4" /></svg>
+          <span>Consultas salvas</span>
+        </button>
+        <div className="user-menu">
+          <div className="avatar" title={user?.email}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#6b7688" strokeWidth="2">
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+            </svg>
+          </div>
+          <span className="user-name">{user?.nome ?? ''}</span>
+          <button className="btn plain" onClick={() => void logout()} title="Sair">
+            <svg className="icon" viewBox="0 0 24 24">
+              <path d="M15 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h9" />
+              <path d="M18 15l4-4-4-4M22 11H9" />
+            </svg>
+            <span>Sair</span>
+          </button>
         </div>
       </div>
     </header>

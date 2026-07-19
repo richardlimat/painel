@@ -17,7 +17,10 @@
 export type MaskClass = 'hard' | 'soft' | 'none';
 
 // Match exato de palavra — nunca revelados, sob nenhuma circunstância.
-const HARD_EXACT = ['password', 'senha', 'hash', 'token', 'cookie', 'secret'];
+// "key" (não "chave"): cobre o padrão comum apiKey/secretKey/accessKey sem
+// quebrar "chavePix" (dado bancário não secreto, classificado como soft
+// abaixo) — "chave" sozinha continua fora daqui de propósito.
+const HARD_EXACT = ['password', 'senha', 'hash', 'token', 'cookie', 'secret', 'key', 'sessao', 'session'];
 // Prefixo de palavra — cobre variações/plurais em pt-BR e en (credencial/
 // credenciais, autorização/autorizacao/authorization).
 const HARD_PREFIX = ['credenc', 'autoriz', 'authoriz'];
@@ -32,9 +35,16 @@ const SOFT_EXACT = [
   'titulo',
   'conta',
   'pix',
+  'agencia',
   'telefone',
   'email',
   'endereco',
+  // nome dos pais (nomeMae/nomePai, filiacaoMae etc.)
+  'mae',
+  'pai',
+  // identificador/login vazado — a credencial em si (senha/hash/token) continua hard
+  'identificador',
+  'login',
 ];
 
 function splitToWords(key: string): string[] {
@@ -73,4 +83,27 @@ export function applyMask(value: string, cls: MaskClass, reveal: boolean): strin
   if (cls === 'none') return value;
   if (cls === 'hard') return maskFully();
   return reveal ? value : maskPartial(value);
+}
+
+/**
+ * Remove recursivamente todo campo "hard" (senha/hash/token/cookie/secret/
+ * chave de API/código de sessão/credenciais) de uma estrutura JSON antes de
+ * persistir — usado ao salvar o snapshot de uma consulta (nunca deve conter
+ * esses campos, mesmo que estivessem presentes na resposta original da
+ * APIFull). Mesma classificação de `classifyKey`, fonte única de verdade
+ * entre a máscara da UI e o filtro do servidor.
+ */
+export function stripHardFields<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((v) => stripHardFields(v)) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (classifyKey(k) === 'hard') continue;
+      result[k] = stripHardFields(v);
+    }
+    return result as T;
+  }
+  return value;
 }

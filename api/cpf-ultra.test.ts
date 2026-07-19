@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { requireSessionMock } = vi.hoisted(() => ({ requireSessionMock: vi.fn() }));
+vi.mock('./_lib/auth', () => ({ requireSession: requireSessionMock }));
+
 import handler, { normalizeAndValidateCpf } from './cpf-ultra';
 
 // Fixture sintética conhecida (não é documento de pessoa real) — usada em
@@ -43,6 +47,8 @@ describe('handler (api/cpf-ultra)', () => {
 
   beforeEach(() => {
     process.env.APIFULL_AUTHORIZATION = 'test-authorization-value';
+    requireSessionMock.mockReset();
+    requireSessionMock.mockResolvedValue({ ok: true, userId: 'user-1' });
     fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ status: 'sucesso', dados: { SERVICE_RESPONSE: {} } }), {
         status: 200,
@@ -60,6 +66,13 @@ describe('handler (api/cpf-ultra)', () => {
   it('rejeita método diferente de POST sem chamar a API', async () => {
     const res = await handler(new Request('http://localhost/api/cpf-ultra', { method: 'GET' }));
     expect(res.status).toBe(405);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('sem sessão válida retorna a resposta de requireSession sem chamar a API paga', async () => {
+    requireSessionMock.mockResolvedValue({ ok: false, response: new Response(null, { status: 401 }) });
+    const res = await handler(postRequest({ cpf: VALID_CPF }));
+    expect(res.status).toBe(401);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

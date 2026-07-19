@@ -38,6 +38,8 @@ export interface PersonData {
   nome: string;
   /** Se a pessoa exerce função de administrador em alguma empresa */
   administrador?: boolean;
+  /** URL http(s) da melhor foto disponível (cadastral.foto > fotos[] > extraFotos[]) — nunca o perfil completo. */
+  photoUrl?: string;
 }
 
 export interface GraphNode {

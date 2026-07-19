@@ -23,6 +23,16 @@ export interface SociedadesStatus {
   failed: string[];
 }
 
+export interface BatchResult {
+  succeeded: string[];
+  failed: string[];
+}
+
+export interface BatchOpts {
+  priority?: boolean;
+  onEach?: (cpf: string, ok: boolean) => void;
+}
+
 interface PersonProfileState {
   profilesByCpf: Map<string, ApiFullProfile>;
   requestsByCpf: Map<string, Promise<ApiFullProfile>>;
@@ -49,6 +59,25 @@ interface PersonProfileState {
   markSociedadeOutcome: (cpf: string, cnpj: string, outcome: 'succeeded' | 'failed') => void;
   /** Move os CNPJs de `failed` de volta para `pending`, sem re-chamar a APIFull. */
   resetFailedToPending: (cpf: string) => void;
+  /** Logout: cancela a fila pendente e limpa todo o cache de perfis/erros — evita vazar dados de um usuário para o próximo login na mesma aba. */
+  clearAllProfiles: () => void;
+  /** Abrir consulta salva: pré-popula o cache com os perfis do snapshot (sanitizados), sem nenhuma chamada à APIFull. */
+  hydrateProfiles: (profiles: Record<string, ApiFullProfile>) => void;
+
+  /**
+   * Mecanismo de lote (batch) sobre a MESMA fila sequencial — sem
+   * `Promise.all`/`allSettled`. `startBatch` abre um lote com os CPFs
+   * iniciais e devolve `batchId` + a Promise que resolve quando o lote
+   * fecha (`sealBatch`) E todos os CPFs que entraram nele já terminaram
+   * (sucesso ou falha, via a própria conclusão do worker único). Use
+   * `addToBatch` para incluir CPFs descobertos depois (ex.: sócios de uma
+   * empresa nova) enquanto o lote ainda está aberto. `runBatch` é o atalho
+   * para o caso simples: lista fixa de CPFs, fecha e aguarda de uma vez.
+   */
+  startBatch: (cpfs: string[], opts?: BatchOpts) => { batchId: string; promise: Promise<BatchResult> };
+  addToBatch: (batchId: string, cpfs: string[], opts?: { priority?: boolean }) => void;
+  sealBatch: (batchId: string) => void;
+  runBatch: (cpfs: string[], opts?: BatchOpts) => Promise<BatchResult>;
 }
 
 type SetFn = (
@@ -68,6 +97,95 @@ const pendingResolvers = new Map<
 
 /** Guarda de execução do worker único — nunca dois loops processando a fila ao mesmo tempo. */
 let workerRunning = false;
+
+/**
+ * Bookkeeping de lotes — puramente imperativo (sem `Promise.all`/`allSettled`
+ * em nenhum ponto): cada CPF que entra num lote é indexado em
+ * `cpfToBatches`; quando o worker único da fila termina esse CPF (sucesso
+ * ou falha) — ou quando o CPF já está em cache no momento do registro —
+ * `recordBatchOutcome` decrementa `remaining` do(s) lote(s) interessados e
+ * resolve a Promise do lote quando ele está selado (`sealed`) e vazio.
+ */
+interface BatchRecord {
+  remaining: Set<string>;
+  succeeded: string[];
+  failed: string[];
+  sealed: boolean;
+  onEach?: (cpf: string, ok: boolean) => void;
+  resolve: (result: BatchResult) => void;
+}
+
+let batchCounter = 0;
+const batches = new Map<string, BatchRecord>();
+/** CPF -> lotes que ainda aguardam a conclusão desse CPF. */
+const cpfToBatches = new Map<string, Set<string>>();
+
+function addBatchWaiter(cpf: string, batchId: string) {
+  let waiters = cpfToBatches.get(cpf);
+  if (!waiters) {
+    waiters = new Set();
+    cpfToBatches.set(cpf, waiters);
+  }
+  waiters.add(batchId);
+}
+
+function removeBatchWaiter(cpf: string, batchId: string) {
+  const waiters = cpfToBatches.get(cpf);
+  if (!waiters) return;
+  waiters.delete(batchId);
+  if (waiters.size === 0) cpfToBatches.delete(cpf);
+}
+
+function maybeResolveBatch(batchId: string) {
+  const batch = batches.get(batchId);
+  if (!batch || !batch.sealed || batch.remaining.size > 0) return;
+  batch.resolve({ succeeded: batch.succeeded, failed: batch.failed });
+  batches.delete(batchId);
+}
+
+/** Chamado pelo worker da fila (sucesso/falha) toda vez que um CPF termina — nunca por agregação em lote. */
+function recordBatchOutcome(cpf: string, ok: boolean) {
+  const waiters = cpfToBatches.get(cpf);
+  if (!waiters) return;
+  for (const batchId of [...waiters]) {
+    const batch = batches.get(batchId);
+    removeBatchWaiter(cpf, batchId);
+    if (!batch || !batch.remaining.has(cpf)) continue;
+    batch.remaining.delete(cpf);
+    if (ok) batch.succeeded.push(cpf);
+    else batch.failed.push(cpf);
+    batch.onEach?.(cpf, ok);
+    maybeResolveBatch(batchId);
+  }
+}
+
+/** Inclui CPFs (validados/deduplicados) num lote existente — ou, se o lote já fechou, apenas os enfileira em segundo plano. */
+function addCpfsToBatch(get: GetFn, set: SetFn, batchId: string, rawCpfs: string[], priority: boolean) {
+  const batch = batches.get(batchId);
+  for (const raw of rawCpfs) {
+    const cpf = onlyDigits(raw);
+    if (!batch) {
+      if (isValidCPF(cpf)) enqueueOne(get, set, cpf, priority);
+      continue;
+    }
+    if (batch.remaining.has(cpf) || batch.succeeded.includes(cpf) || batch.failed.includes(cpf)) continue;
+    if (!isValidCPF(cpf)) {
+      batch.failed.push(cpf);
+      batch.onEach?.(cpf, false);
+      continue;
+    }
+    const cached = get().profilesByCpf.get(cpf);
+    if (cached) {
+      batch.succeeded.push(cpf);
+      batch.onEach?.(cpf, true);
+      continue;
+    }
+    batch.remaining.add(cpf);
+    addBatchWaiter(cpf, batchId);
+    enqueueOne(get, set, cpf, priority);
+  }
+  maybeResolveBatch(batchId);
+}
 
 function runQueue(get: GetFn, set: SetFn) {
   if (workerRunning) return;
@@ -95,6 +213,7 @@ function runQueue(get: GetFn, set: SetFn) {
         });
         pendingResolvers.get(cpf)?.resolve(profile);
         pendingResolvers.delete(cpf);
+        recordBatchOutcome(cpf, true);
       } catch (err) {
         set((s) => {
           const requests = new Map(s.requestsByCpf);
@@ -110,6 +229,7 @@ function runQueue(get: GetFn, set: SetFn) {
         });
         pendingResolvers.get(cpf)?.reject(err);
         pendingResolvers.delete(cpf);
+        recordBatchOutcome(cpf, false);
       }
     }
     workerRunning = false;
@@ -192,6 +312,8 @@ export const usePersonProfileStore = create<PersonProfileState>((set, get) => ({
     for (const cpf of cancelled) {
       pendingResolvers.get(cpf)?.reject(new Error('Consulta cancelada: nova pesquisa iniciada.'));
       pendingResolvers.delete(cpf);
+      // Sem isso, um lote (batch) aguardando este CPF nunca fecharia — ele nunca mais será processado pelo worker.
+      recordBatchOutcome(cpf, false);
     }
   },
 
@@ -218,6 +340,62 @@ export const usePersonProfileStore = create<PersonProfileState>((set, get) => ({
       if (!current || current.failed.length === 0) return {};
       const next: SociedadesStatus = { pending: [...current.pending, ...current.failed], succeeded: current.succeeded, failed: [] };
       return { sociedadesStatusByCpf: new Map(s.sociedadesStatusByCpf).set(cpf, next) };
+    });
+  },
+
+  clearAllProfiles: () => {
+    get().cancelPendingQueue();
+    set({
+      profilesByCpf: new Map(),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+  },
+
+  startBatch: (cpfs, opts) => {
+    const batchId = `batch-${++batchCounter}`;
+    let resolveFn!: (result: BatchResult) => void;
+    const promise = new Promise<BatchResult>((resolve) => {
+      resolveFn = resolve;
+    });
+    batches.set(batchId, {
+      remaining: new Set(),
+      succeeded: [],
+      failed: [],
+      sealed: false,
+      onEach: opts?.onEach,
+      resolve: resolveFn,
+    });
+    addCpfsToBatch(get, set, batchId, cpfs, Boolean(opts?.priority));
+    return { batchId, promise };
+  },
+
+  addToBatch: (batchId, cpfs, opts) => {
+    addCpfsToBatch(get, set, batchId, cpfs, Boolean(opts?.priority));
+  },
+
+  sealBatch: (batchId) => {
+    const batch = batches.get(batchId);
+    if (!batch) return;
+    batch.sealed = true;
+    maybeResolveBatch(batchId);
+  },
+
+  runBatch: (cpfs, opts) => {
+    const { batchId, promise } = get().startBatch(cpfs, opts);
+    get().sealBatch(batchId);
+    return promise;
+  },
+
+  hydrateProfiles: (profiles) => {
+    set((s) => {
+      const next = new Map(s.profilesByCpf);
+      for (const [cpf, profile] of Object.entries(profiles)) next.set(onlyDigits(cpf), profile);
+      return { profilesByCpf: next };
     });
   },
 }));
