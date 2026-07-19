@@ -2049,6 +2049,222 @@
   padding: 3px 9px;
 }
 
+.ef-muted {
+  color: var(--muted);
+}
+
+/* Cards de pessoas relacionadas (parentesco, relacionados por endereço) */
+.ef-people {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 14px;
+}
+.ef-person-card {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+  padding: 14px 16px;
+}
+.ef-person-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.ef-person-avatar {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  padding: 0;
+  background: #eef2f7;
+  display: grid;
+  place-items: center;
+  color: #64748b;
+}
+.ef-person-avatar:not(:disabled) {
+  cursor: zoom-in;
+}
+.ef-person-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ef-person-avatar-icon {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  fill: none;
+}
+.ef-person-title {
+  min-width: 0;
+  flex: 1;
+}
+.ef-person-title strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.ef-person-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+.ef-relation {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.ef-flag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #b42318;
+  background: #fef3f2;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+.ef-consult {
+  flex: none;
+  align-self: flex-start;
+  border: 1px solid var(--blue);
+  background: var(--blue);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 650;
+  border-radius: 8px;
+  padding: 7px 13px;
+}
+.ef-consult:hover {
+  background: #1257c9;
+  border-color: #1257c9;
+}
+.ef-person-grid {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+}
+.ef-person-grid .ef-card {
+  padding: 9px 11px;
+  border-radius: 9px;
+  background: #fafbfc;
+}
+.ef-person-grid .ef-card-value {
+  font-size: 12.5px;
+}
+
+/* Vazamentos de credenciais */
+.ef-leak-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ef-leak {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  font-size: 12px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fafbfc;
+}
+.ef-leak-host {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink);
+  font-weight: 600;
+}
+.ef-leak-login {
+  overflow: hidden;
+  color: #475569;
+}
+.ef-leak-pass {
+  color: #b42318;
+}
+.ef-leak-date {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+@media (max-width: 640px) {
+  .ef-leak {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* Linha do tempo */
+.ef-timeline {
+  position: relative;
+  padding-left: 6px;
+}
+.ef-timeline-item {
+  display: grid;
+  grid-template-columns: 16px 96px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 9px 0;
+  border-bottom: 1px solid #f0f1f3;
+}
+.ef-timeline-dot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  margin-top: 3px;
+  background: #94a3b8;
+}
+.ef-timeline-dot.trabalho { background: #2563eb; }
+.ef-timeline-dot.empresarial { background: #7c3aed; }
+.ef-timeline-dot.familia { background: #db2777; }
+.ef-timeline-dot.politica { background: #ca8a04; }
+.ef-timeline-dot.saude { background: #059669; }
+.ef-timeline-dot.pessoal { background: #0891b2; }
+.ef-timeline-dot.cnh { background: #ea580c; }
+.ef-timeline-date {
+  font-size: 11px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  padding-top: 1px;
+}
+.ef-timeline-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ef-timeline-cat {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.ef-timeline-desc {
+  font-size: 13px;
+  color: var(--ink);
+}
+@media (max-width: 640px) {
+  .ef-timeline-item {
+    grid-template-columns: 12px 1fr;
+  }
+  .ef-timeline-date {
+    grid-column: 2;
+  }
+}
+
 @media (max-width: 640px) {
   .ef-hero {
     flex-wrap: wrap;
@@ -2056,5 +2272,8 @@
   .ef-search {
     order: 3;
     width: 100%;
+  }
+  .ef-people {
+    grid-template-columns: 1fr;
   }
 }

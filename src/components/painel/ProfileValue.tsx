@@ -321,6 +321,79 @@ export function ProfileCardEntries({
   );
 }
 
+/**
+ * Corpo de um valor (array/objeto/escalar) renderizado em cartões, SEM título —
+ * reaproveitado pela sub-seção titulada (`ProfileCardGroup`) e pelas seções
+ * genéricas do schema (`ProfileSections`). Arrays de escalares viram chips;
+ * arrays de objetos viram "records"; objetos viram uma grade de campos.
+ */
+export function ProfileValueBlock({
+  keyName,
+  value,
+  query,
+  onOpenImage,
+  depth = 0,
+}: {
+  keyName: string;
+  value: unknown;
+  query: string;
+  onOpenImage: (url: string) => void;
+  depth?: number;
+}) {
+  if (depth > MAX_RENDER_DEPTH) return <p className="ef-empty">…</p>;
+
+  if (Array.isArray(value)) {
+    if (value.length === 0) return <p className="ef-empty">Nenhum registro encontrado</p>;
+    const { visible, hiddenCount } = truncateItems(value);
+    const allScalars = visible.every((item) => classifyLeaf(keyName, item) !== null);
+    return (
+      <>
+        {allScalars ? (
+          <div className="ef-chips">
+            {visible.map((item, i) => (
+              <span className="ef-chip" key={i}>
+                <CardScalar keyName={keyName} label={keyName} value={item} query={query} onOpenImage={onOpenImage} />
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="ef-records">
+            {visible.map((item, i) => (
+              <div className="ef-record" key={i}>
+                {classifyLeaf(keyName, item) !== null ? (
+                  <div className="ef-card-value">
+                    <CardScalar keyName={keyName} label={keyName} value={item} query={query} onOpenImage={onOpenImage} />
+                  </div>
+                ) : (
+                  <ProfileCardEntries
+                    entries={Object.entries(item as Record<string, unknown>)}
+                    query={query}
+                    onOpenImage={onOpenImage}
+                    depth={depth + 1}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {hiddenCount > 0 && <p className="profile-more">+{hiddenCount} mais</p>}
+      </>
+    );
+  }
+
+  if (value !== null && typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>);
+    if (entries.length === 0) return <p className="ef-empty">Nenhum registro encontrado</p>;
+    return <ProfileCardEntries entries={entries} query={query} onOpenImage={onOpenImage} depth={depth + 1} />;
+  }
+
+  return (
+    <div className="ef-card-value">
+      <CardScalar keyName={keyName} label={keyName} value={value} query={query} onOpenImage={onOpenImage} />
+    </div>
+  );
+}
+
 /** Uma sub-seção titulada (objeto ou array) dentro de uma página. */
 function ProfileCardGroup({
   name,
@@ -338,65 +411,13 @@ function ProfileCardGroup({
   depth: number;
 }) {
   const count = countRecords(value);
-
-  let body: ReactNode;
-  if (Array.isArray(value)) {
-    if (value.length === 0) {
-      body = <p className="ef-empty">Nenhum registro encontrado</p>;
-    } else {
-      const { visible, hiddenCount } = truncateItems(value);
-      const allScalars = visible.every((item) => classifyLeaf(keyName, item) !== null);
-      body = (
-        <>
-          {allScalars ? (
-            <div className="ef-chips">
-              {visible.map((item, i) => (
-                <span className="ef-chip" key={i}>
-                  <CardScalar keyName={keyName} label={name} value={item} query={query} onOpenImage={onOpenImage} />
-                </span>
-              ))}
-            </div>
-          ) : (
-            <div className="ef-records">
-              {visible.map((item, i) => (
-                <div className="ef-record" key={i}>
-                  {classifyLeaf(keyName, item) !== null ? (
-                    <div className="ef-card-value">
-                      <CardScalar keyName={keyName} label={name} value={item} query={query} onOpenImage={onOpenImage} />
-                    </div>
-                  ) : (
-                    <ProfileCardEntries
-                      entries={Object.entries(item as Record<string, unknown>)}
-                      query={query}
-                      onOpenImage={onOpenImage}
-                      depth={depth + 1}
-                    />
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-          {hiddenCount > 0 && <p className="profile-more">+{hiddenCount} mais</p>}
-        </>
-      );
-    }
-  } else {
-    const entries = Object.entries(value as Record<string, unknown>);
-    body =
-      entries.length === 0 ? (
-        <p className="ef-empty">Nenhum registro encontrado</p>
-      ) : (
-        <ProfileCardEntries entries={entries} query={query} onOpenImage={onOpenImage} depth={depth + 1} />
-      );
-  }
-
   return (
     <section className="ef-group">
       <h4 className="ef-group-title">
         {highlightMatch(name, query)}
         {count != null && <span className="ef-count">{count}</span>}
       </h4>
-      {body}
+      <ProfileValueBlock keyName={keyName} value={value} query={query} onOpenImage={onOpenImage} depth={depth} />
     </section>
   );
 }

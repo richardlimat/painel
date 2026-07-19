@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { EntityDetail } from './EntityDetail';
 import { usePersonProfileStore } from '../../store/personProfileStore';
@@ -9,21 +9,40 @@ import type { ApiFullProfile } from '../../services/apifull';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
 const PERSON_CPF = '11144477735';
-const RAW_SECRET = 'segredo-super-confidencial';
-const RAW_BASE64_DOC = 'A'.repeat(2500); // > 2000 chars — sempre tratado como documento
+const PARENTE_CPF = '52998224725'; // CPF sintético válido (checksum ok)
+const RAW_PASSWORD = 'iade0509';
 
 const PROFILE: ApiFullProfile = {
   SERVICE_RESPONSE: {
-    cadastral: { nome: 'FULANO DE TAL', dataNascimento: '1990-05-10', sexo: 'MASCULINO' },
+    cadastral: {
+      nome: 'FULANO DE TAL',
+      cpfMask: '111.444.777-35',
+      dataNasc: '16/03/1973',
+      idade: 53,
+      sexo: 'M',
+      signo: 'Peixes',
+      signoChines: 'Boi',
+      classeSocial: 'A',
+      escolaridade: 'SUPERIOR COMPLETO',
+      mae: { nome: 'MARIA JOSE' },
+      pai: { nome: 'CICERO' },
+      cns: 700004153088603,
+      pis: 12625028019,
+      tituloEleitor: { numero: 16854861716, zona: '1', secao: '248' },
+    },
+    cnh: { nome: 'FULANO DE TAL', registro: '00560237696', uf_cnh: 'AL' },
     parentes: [
-      { nome: 'MAE DE FULANO', cpfParente: '52998224725' },
-      { nome: 'PAI DE FULANO', cpfParente: '39053344705' },
+      { grau: 'Filho', nome: 'MARIA LUZIMAR', cpfParente: PARENTE_CPF, idade: 26, renda: 'R$ 1.621,00', cidade: 'Maceió', uf: 'AL', profissao: 'Continuo' },
     ],
-    telefones: ['11999990000'],
-    credenciaisVazadas: [{ senha: RAW_SECRET, origem: 'vazamento X' }],
-    docsBase64: RAW_BASE64_DOC,
-    veiculos: [{ placa: 'ABC1D23', modelo: 'CARRO' }],
-    sociedades: [],
+    telefones: [{ telefone: '(82) 996302401', flagWhatsApp: false, classificacao: 'A', data: '19/01/2025' }],
+    sociedades: [
+      { razao_social: 'WRV LTDA', cnpj: '21819440000145', qualificacao_socio_descricao: 'Sócio-Administrador', situacao_cadastral: 'ATIVA', dt_entrada: '09/03/2021' },
+    ],
+    credenciaisVazadas: [
+      { tipo: 'EMAIL', valor: 'x@y.com', resultados: [{ host: 'accounts.google.com', login: 'x@y.com', password: RAW_PASSWORD, file_date: '2024-01-01' }] },
+    ],
+    placas: [],
+    linhaDoTempo: [{ data: '1973-03-16', categoria: 'PESSOAL', descricao: 'Nascimento de <b>Fulano</b>' }],
   },
 };
 
@@ -73,10 +92,22 @@ function selectNode(node: GraphNode, extraNodes: GraphNode[] = [], links: GraphL
     nodes: [...nodeIndex.values()],
     links,
     selectedNodeId: node.id,
+    unsavedChanges: false,
   });
 }
 
-describe('EntityDetail — pessoa em tela cheia com 8 abas temáticas', () => {
+const PAGE_LABELS = [
+  'Cadastral & Civil',
+  'Contatos & Endereços',
+  'Financeiro & Consumo',
+  'Carreira & Negócios',
+  'Cyber Sec & Vazamentos',
+  'Presença & Viagens',
+  'Bens & Patrimônio',
+  'Saúde & Outros',
+];
+
+describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', () => {
   beforeEach(() => {
     seedProfileCache();
     selectNode(PERSON_NODE);
@@ -85,57 +116,52 @@ describe('EntityDetail — pessoa em tela cheia com 8 abas temáticas', () => {
 
   it('renderiza as 8 abas nomeadas na ordem pedida', () => {
     render(<EntityDetail />);
-    const labels = [
-      'Cadastral & Civil',
-      'Contatos & Endereços',
-      'Financeiro & Consumo',
-      'Carreira & Negócios',
-      'Cyber Sec & Vazamentos',
-      'Presença & Viagens',
-      'Bens & Patrimônio',
-      'Saúde & Outros',
-    ];
-    for (const l of labels) {
+    for (const l of PAGE_LABELS) {
       expect(screen.getByRole('button', { name: new RegExp(l) })).toBeInTheDocument();
     }
   });
 
-  it('a aba inicial mostra os dados cadastrais e trocar de aba muda o conteúdo', () => {
+  it('a aba Cadastral & Civil mostra as seções curadas (Registro Civil, Título de Eleitor, CNH)', () => {
     render(<EntityDetail />);
-    // Cadastral & Civil (aba 0): data de nascimento formatada aparece
-    expect(screen.getByText('10/05/1990')).toBeInTheDocument();
-
-    // trocar para Bens & Patrimônio mostra o veículo
-    fireEvent.click(screen.getByRole('button', { name: /Bens & Patrimônio/ }));
-    expect(screen.getByText('ABC1D23')).toBeInTheDocument();
-    expect(screen.queryByText('10/05/1990')).not.toBeInTheDocument();
+    expect(screen.getByText('Dados de Registro Civil & RFB')).toBeInTheDocument();
+    expect(screen.getByText('Título de Eleitor')).toBeInTheDocument();
+    expect(screen.getByText('Dados de Habilitação (CNH)')).toBeInTheDocument();
+    // valor derivado/curado com rótulo em pt-BR
+    expect(screen.getByText('Signo ocidental')).toBeInTheDocument();
+    expect(screen.getByText('Peixes')).toBeInTheDocument();
+    // card de parentesco com botão Consultar
+    expect(screen.getByText('MARIA LUZIMAR')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Consultar' })).toBeInTheDocument();
   });
 
-  it('senha (campo hard) nunca aparece crua na aba de vazamentos — sem botão Revelar', () => {
+  it('trocar de aba muda o conteúdo (Bens & Patrimônio mostra estado vazio)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Bens & Patrimônio/ }));
+    expect(screen.getByText('Nenhum veículo/placa encontrado.')).toBeInTheDocument();
+    expect(screen.queryByText('Dados de Registro Civil & RFB')).not.toBeInTheDocument();
+  });
+
+  it('senha vazada nunca aparece crua na aba de vazamentos', () => {
     const { container } = render(<EntityDetail />);
     fireEvent.click(screen.getByRole('button', { name: /Cyber Sec & Vazamentos/ }));
-    expect(screen.getByText('vazamento X')).toBeInTheDocument(); // origem visível
-    expect(container.textContent).not.toContain(RAW_SECRET);
-    expect(screen.queryByText('Revelar')).not.toBeInTheDocument();
+    expect(screen.getByText('accounts.google.com')).toBeInTheDocument();
+    expect(container.textContent).not.toContain(RAW_PASSWORD);
   });
 
-  it('Base64 grande nunca vira texto cru — só "Documento disponível"', () => {
-    const { container } = render(<EntityDetail />);
-    expect(screen.getByText(/Documento disponível/)).toBeInTheDocument();
-    expect(container.textContent).not.toContain(RAW_BASE64_DOC.slice(0, 200));
-  });
-
-  it('a busca reúne resultados de todas as páginas numa visão única', () => {
+  it('a busca reúne seções de todas as páginas que casam', () => {
     render(<EntityDetail />);
-    fireEvent.change(screen.getByPlaceholderText('Buscar nas informações'), { target: { value: 'parentes' } });
-    expect(screen.getByText(/Resultados da busca/)).toBeInTheDocument();
-    expect(screen.getByText('MAE DE FULANO')).toBeInTheDocument();
-    expect(screen.getByText('PAI DE FULANO')).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText('Buscar nas informações'), { target: { value: 'WRV' } });
+    expect(screen.getByText('Sociedades (empresas)')).toBeInTheDocument();
+    // "WRV" fica destacado (quebrado por <mark>); confere um campo não destacado do mesmo registro
+    expect(screen.getByText('Sócio-Administrador')).toBeInTheDocument();
+  });
 
-    // clicar numa aba limpa a busca e volta à navegação normal
-    fireEvent.click(screen.getByRole('button', { name: /Cadastral & Civil/ }));
-    expect(screen.queryByText(/Resultados da busca/)).not.toBeInTheDocument();
-    expect(screen.getByText('10/05/1990')).toBeInTheDocument();
+  it('clicar em "Consultar" num parente dispara uma nova consulta', () => {
+    const startPersonSearch = vi.fn();
+    useGraphStore.setState({ startPersonSearch });
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: 'Consultar' }));
+    expect(startPersonSearch).toHaveBeenCalledWith(PARENTE_CPF);
   });
 });
 
@@ -153,7 +179,6 @@ describe('EntityDetail — empresa em página única', () => {
     expect(screen.getByText('11.222.333/0001-81')).toBeInTheDocument();
     expect(screen.getByText('Informações gerais')).toBeInTheDocument();
     expect(screen.getByText(/Atividades de contabilidade/)).toBeInTheDocument();
-    // não há abas temáticas de pessoa
     expect(screen.queryByRole('button', { name: /Cyber Sec & Vazamentos/ })).not.toBeInTheDocument();
   });
 

@@ -2,17 +2,26 @@ import { useEffect, useMemo, useState } from 'react';
 import { useGraphStore } from '../../store/graphStore';
 import { usePersonProfileStore } from '../../store/personProfileStore';
 import { formatCNPJ, formatCPF, formatCurrency, formatDate, normalizeText } from '../../lib/format';
-import { PROFILE_PAGE_ORDER, groupServiceResponseIntoPages } from '../../lib/profilePages';
+import { PROFILE_PAGES, PROFILE_PAGE_NAMES, unmappedGenericSections, type SectionSpec } from '../../lib/profileSchema';
 import { RELATION_LABELS } from '../../lib/colors';
 import { CompanyIcon, PersonIcon } from '../flow/icons';
 import { ImageLightbox } from './ImageLightbox';
-import { ProfileCardEntries, entryMatchesQuery } from './ProfileValue';
+import { valueMatchesQuery } from './ProfileValue';
+import { ProfileSectionView } from './ProfileSections';
+import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
 const nid = (v: string | GraphNode) => (typeof v === 'string' ? v : v.id);
 
 /** Abas exibidas (desabilitadas) enquanto o perfil ainda carrega — evita o layout "pular". */
-const NAV_PLACEHOLDER = PROFILE_PAGE_ORDER;
+const NAV_PLACEHOLDER = PROFILE_PAGE_NAMES;
+
+/** Seções de uma página (a última recebe as chaves não mapeadas, p/ nada se perder). */
+function sectionsForPage(pageIndex: number, sr: Record<string, unknown>): SectionSpec[] {
+  const base = PROFILE_PAGES[pageIndex]?.sections ?? [];
+  if (pageIndex === PROFILE_PAGES.length - 1) return [...base, ...unmappedGenericSections(sr)];
+  return base;
+}
 
 /** Conexões (arestas) de um nó já carregadas no grafo. */
 function useRelated(node: GraphNode | null) {
@@ -171,6 +180,8 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
   const loading = usePersonProfileStore((s) => s.requestsByCpf.has(digits) || s.requestsByCpf.has(cpf));
   const error = usePersonProfileStore((s) => s.errorsByCpf.get(digits) ?? s.errorsByCpf.get(cpf));
   const related = useRelated(node);
+  const startPersonSearch = useGraphStore((s) => s.startPersonSearch);
+  const unsavedChanges = useGraphStore((s) => s.unsavedChanges);
 
   const [activePage, setActivePage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
@@ -183,47 +194,50 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
     setLightboxSrc(null);
   }, [digits, loadProfile]);
 
+  const sr = profile?.SERVICE_RESPONSE ?? {};
+  const cadastral = (sr.cadastral ?? {}) as Record<string, unknown>;
   const query = normalizeText(searchQuery.trim());
 
-  const pages = useMemo(
-    () => (profile ? groupServiceResponseIntoPages(profile.SERVICE_RESPONSE) : []),
-    [profile],
-  );
+  // "Consultar" pivota para uma nova investigação (substitui o mapa atual) — com
+  // confirmação quando há trabalho não salvo, pra não perder dados sem querer.
+  const onConsult = (targetCpf: string) => {
+    if (
+      unsavedChanges &&
+      !window.confirm('Isso abre uma nova consulta e substitui o mapa atual. Alterações não salvas serão perdidas. Continuar?')
+    ) {
+      return;
+    }
+    void startPersonSearch(targetCpf);
+  };
 
-  // Resultados de busca são planos (todas as páginas), mantendo só as entradas que casam.
-  const searchResults = useMemo(() => {
-    if (!query) return [];
-    return pages
-      .flatMap((p) => p.entries)
-      .filter(([k, v]) => entryMatchesQuery(k, v, query));
-  }, [pages, query]);
+  // Busca: percorre TODAS as páginas e mantém só as seções cujo título ou dados casam.
+  const matchedSections = useMemo(() => {
+    if (!query || !profile) return [];
+    const all: SectionSpec[] = PROFILE_PAGES.flatMap((_, i) => sectionsForPage(i, sr));
+    return all.filter(
+      (s) => normalizeText(s.title).includes(query) || valueMatchesQuery(sr[s.source], query),
+    );
+  }, [query, profile, sr]);
 
-  const current = pages[activePage];
+  const activeSections = profile ? sectionsForPage(activePage, sr) : [];
 
   return (
     <>
       <nav className="ef-nav" aria-label="Seções do perfil">
-        {pages.length === 0
-          ? // enquanto o perfil carrega, mostra as abas nomeadas (desabilitadas) pra estrutura não "pular"
-            NAV_PLACEHOLDER.map((name) => (
-              <button key={name} type="button" className="ef-tab" disabled>
-                {name}
-              </button>
-            ))
-          : pages.map((p, i) => (
-              <button
-                key={p.name}
-                type="button"
-                className={`ef-tab ${!query && i === activePage ? 'active' : ''}`}
-                onClick={() => {
-                  setActivePage(i);
-                  setSearchQuery('');
-                }}
-              >
-                {p.name}
-                {p.entries.length > 0 && <span className="ef-tab-count">{p.entries.length}</span>}
-              </button>
-            ))}
+        {NAV_PLACEHOLDER.map((name, i) => (
+          <button
+            key={name}
+            type="button"
+            className={`ef-tab ${!query && i === activePage ? 'active' : ''}`}
+            disabled={!profile}
+            onClick={() => {
+              setActivePage(i);
+              setSearchQuery('');
+            }}
+          >
+            {name}
+          </button>
+        ))}
       </nav>
 
       <div className="ef-body person">
@@ -242,6 +256,8 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
             </h1>
             <div className="ef-hero-badges">
               <span className="ef-badge mono">{formatCPF(cpf)}</span>
+              {!isEmpty(cadastral.idade) && <span className="ef-hero-sub">{fmtText(cadastral.idade)} anos</span>}
+              {!isEmpty(cadastral.classeSocial) && <span className="ef-hero-sub">Classe {fmtText(cadastral.classeSocial)}</span>}
               <span className="ef-hero-sub">Camada {node.depth} na rede</span>
             </div>
           </div>
@@ -273,34 +289,42 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
         {!loading && !error && profile && (
           <div className="ef-pages">
             {query ? (
-              <section className="ef-section">
-                <h3 className="ef-section-title">
-                  Resultados da busca<span className="ef-count">{searchResults.length}</span>
-                </h3>
-                {searchResults.length === 0 ? (
-                  <p className="ef-empty">Nenhum registro encontrado.</p>
-                ) : (
-                  <ProfileCardEntries entries={searchResults} query={searchQuery.trim()} onOpenImage={setLightboxSrc} />
-                )}
-              </section>
-            ) : current ? (
-              <section className="ef-section">
-                <h3 className="ef-section-title">{current.name}</h3>
-                {current.entries.length === 0 ? (
-                  <p className="ef-empty">Nenhuma informação disponível nesta seção.</p>
-                ) : (
-                  <ProfileCardEntries entries={current.entries} query="" onOpenImage={setLightboxSrc} />
-                )}
-                {current.name === 'Carreira & Negócios' && (
-                  <div className="ef-group">
-                    <h4 className="ef-group-title">
+              matchedSections.length === 0 ? (
+                <p className="ef-empty">Nenhum registro encontrado para “{searchQuery.trim()}”.</p>
+              ) : (
+                matchedSections.map((spec, i) => (
+                  <ProfileSectionView
+                    key={`${spec.title}-${i}`}
+                    spec={spec}
+                    serviceResponse={sr}
+                    query={query}
+                    onOpenImage={setLightboxSrc}
+                    onConsult={onConsult}
+                  />
+                ))
+              )
+            ) : (
+              <>
+                {activeSections.map((spec, i) => (
+                  <ProfileSectionView
+                    key={`${spec.title}-${i}`}
+                    spec={spec}
+                    serviceResponse={sr}
+                    query=""
+                    onOpenImage={setLightboxSrc}
+                    onConsult={onConsult}
+                  />
+                ))}
+                {PROFILE_PAGES[activePage]?.name === 'Carreira & Negócios' && (
+                  <section className="ef-section">
+                    <h3 className="ef-section-title">
                       Conexões no mapa<span className="ef-count">{related.length}</span>
-                    </h4>
+                    </h3>
                     <Connections related={related} onGo={onGo} />
-                  </div>
+                  </section>
                 )}
-              </section>
-            ) : null}
+              </>
+            )}
           </div>
         )}
 
@@ -309,6 +333,8 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
     </>
   );
 }
+
+const isEmpty = (v: unknown) => v == null || v === '' || String(v).toLowerCase() === 'n/a';
 
 /**
  * Detalhe da entidade em TELA CHEIA (substitui o antigo painel lateral). Ao
