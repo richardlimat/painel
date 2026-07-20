@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isValidCPF, maskCPF } from './format';
+import { caretPositionForDigitCount, isValidCPF, maskCPF } from './format';
 
 describe('maskCPF', () => {
   it('aplica a máscara progressivamente conforme os dígitos entram', () => {
@@ -16,6 +16,20 @@ describe('maskCPF', () => {
   it('ignora caracteres não numéricos e trunca em 11 dígitos', () => {
     expect(maskCPF('111.444.777-35')).toBe('111.444.777-35');
     expect(maskCPF('111444777359999')).toBe('111.444.777-35');
+  });
+});
+
+describe('caretPositionForDigitCount', () => {
+  it('posiciona o cursor logo após o N-ésimo dígito, pulando pontuação', () => {
+    // "111.444.777-35" — dígitos nos índices 0,1,2, 4,5,6, 8,9,10, 12,13
+    expect(caretPositionForDigitCount('111.444.777-35', 0)).toBe(0);
+    expect(caretPositionForDigitCount('111.444.777-35', 3)).toBe(3); // logo antes do primeiro "."
+    expect(caretPositionForDigitCount('111.444.777-35', 4)).toBe(5); // 1 dígito depois do ".", cursor após ele
+    expect(caretPositionForDigitCount('111.444.777-35', 11)).toBe(14); // todos os dígitos
+  });
+
+  it('cai no fim da string quando pede mais dígitos do que existem', () => {
+    expect(caretPositionForDigitCount('111.4', 99)).toBe(5);
   });
 });
 

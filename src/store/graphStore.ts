@@ -427,7 +427,7 @@ function mergeApiFullSociedadeRelation(state: GraphState, personNode: GraphNode,
   addOrMergeLink(links, personNode.id, cId, relation, {
     dataEntrada: parseBrDate(s.dtEntrada),
     situacao: s.situacaoCadastral || 'ATIVO',
-    origem: 'APIFull / sociedades',
+    origem: 'Consulta por CPF',
     funcao: s.qualificacaoSocioDescricao,
   });
 
@@ -891,10 +891,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       (n) => n.kind === 'person' && !n.expanded && n.depth < maxDepth,
     ).length;
     if (pendingPeopleCount > 0) {
-      // "Expandir Tudo" pode disparar uma cascata de consultas pagas (APIFull + FonteData)
-      // — confirmação explícita antes de gastar créditos sem o usuário pedir uma pessoa por vez.
+      // "Expandir Tudo" pode disparar uma cascata de consultas pagas — confirmação
+      // explícita antes de gastar créditos sem o usuário pedir uma pessoa por vez.
       const confirmed = window.confirm(
-        `"Expandir Tudo" vai consultar a APIFull para ${pendingPeopleCount} pessoa(s) (e possivelmente novas empresas na FonteData) — isso consome créditos pagos das duas APIs e pode continuar em cascata por várias camadas. Deseja continuar?`,
+        `"Expandir Tudo" vai consultar dados para ${pendingPeopleCount} pessoa(s) (e possivelmente novas empresas) — isso consome créditos pagos e pode continuar em cascata por várias camadas. Deseja continuar?`,
       );
       if (!confirmed) return;
     }
@@ -911,7 +911,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }
       if (apiFullCallsThisRun >= MAX_APIFULL_CALLS_PER_EXPAND_ALL) {
         set({
-          notice: `Expansão interrompida após ${MAX_APIFULL_CALLS_PER_EXPAND_ALL} consultas novas à APIFull nesta execução (limite de custo). Use "+" para continuar manualmente.`,
+          notice: `Expansão interrompida após ${MAX_APIFULL_CALLS_PER_EXPAND_ALL} consultas novas nesta execução (limite de custo). Use "+" para continuar manualmente.`,
         });
         break;
       }

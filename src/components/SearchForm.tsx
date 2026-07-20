@@ -1,7 +1,7 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useGraphStore } from '../store/graphStore';
-import { isValidCNPJ, isValidCPF, maskCNPJ, maskCPF, onlyDigits, formatDate } from '../lib/format';
+import { caretPositionForDigitCount, isValidCNPJ, isValidCPF, maskCNPJ, maskCPF, onlyDigits, formatDate } from '../lib/format';
 import { applyMask } from '../lib/mask';
 import { listSavedQueries, getSavedQuery, type SavedQuerySummary } from '../services/savedQueries';
 
@@ -144,6 +144,22 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
     setValidationError(null);
   };
 
+  // Reformata a cada tecla (maskCNPJ/maskCPF) mas devolve o cursor pro lugar
+  // certo — sem isso, apagar/editar um dígito no meio do texto reposiciona
+  // o cursor pro fim a cada tecla (o React troca o `value` todo e o
+  // navegador não sabe onde ele "deveria" continuar).
+  const handleMaskedChange = (mask: (v: string) => string, setValue: (v: string) => void) => (e: ChangeEvent<HTMLInputElement>) => {
+    const input = e.target;
+    const selStart = input.selectionStart ?? input.value.length;
+    const digitsBeforeCursor = onlyDigits(input.value.slice(0, selStart)).length;
+    const masked = mask(input.value);
+    setValue(masked);
+    requestAnimationFrame(() => {
+      const pos = caretPositionForDigitCount(masked, digitsBeforeCursor);
+      input.setSelectionRange(pos, pos);
+    });
+  };
+
   const submit = (e: FormEvent) => {
     e.preventDefault();
     if (mode === 'cnpj') {
@@ -231,7 +247,7 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
               <input
                 id="cnpj"
                 value={cnpj}
-                onChange={(e) => setCnpj(maskCNPJ(e.target.value))}
+                onChange={handleMaskedChange(maskCNPJ, setCnpj)}
                 placeholder="00.000.000/0000-00"
                 inputMode="numeric"
                 className="min-w-0 flex-1 border-0 bg-transparent py-2 text-base tracking-wide text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"
@@ -241,7 +257,7 @@ export function SearchForm({ onOpenSavedQueries }: { onOpenSavedQueries?: () => 
               <input
                 id="cpf"
                 value={cpf}
-                onChange={(e) => setCpf(maskCPF(e.target.value))}
+                onChange={handleMaskedChange(maskCPF, setCpf)}
                 placeholder="000.000.000-00"
                 inputMode="numeric"
                 className="min-w-0 flex-1 border-0 bg-transparent py-2 text-base tracking-wide text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"

@@ -117,24 +117,23 @@ function messageForStatus(status: number, detail: string | undefined): string {
       return `CNPJ ou parâmetro inválido.${suffix}`;
     case 401:
     case 403:
-      return `Chave de API da FonteData ausente ou inválida (configuração do servidor).${suffix}`;
+      return `Chave de API ausente ou inválida (configuração do servidor).${suffix}`;
     case 402:
-      return `Saldo insuficiente na conta FonteData.${suffix}`;
+      return `Saldo insuficiente para consulta.${suffix}`;
     case 429:
-      return `Limite de requisições da FonteData excedido. Tente novamente em instantes.${suffix}`;
+      return `Limite de requisições excedido. Tente novamente em instantes.${suffix}`;
     default:
-      if (status >= 500 && status <= 503) return `FonteData indisponível no momento.${suffix}`;
-      return `Falha na consulta FonteData (HTTP ${status})${suffix}`;
+      if (status >= 500 && status <= 503) return `Serviço de consulta indisponível no momento.${suffix}`;
+      return `Falha na consulta (HTTP ${status})${suffix}`;
   }
 }
 
 /**
- * Provedor baseado na FonteData (https://fontedata.com), API comercial de
- * dados cadastrais de pessoas jurídicas. Suporta consulta de CNPJ + QSA;
- * não suporta busca reversa por CPF.
+ * Provedor comercial de dados cadastrais de pessoas jurídicas. Suporta
+ * consulta de CNPJ + QSA; não suporta busca reversa por CPF.
  */
 export class FonteDataProvider implements DataProvider {
-  readonly name = 'FonteData';
+  readonly name = 'Consulta cadastral de empresas';
   /** Cache por CNPJ normalizado: evita cobrar duas vezes o mesmo documento
    * mesmo quando ele é descoberto por dois caminhos diferentes do grafo
    * quase ao mesmo tempo. Sobrevive a reset/recolher do grafo (dura a
@@ -171,7 +170,7 @@ export class FonteDataProvider implements DataProvider {
     try {
       data = (await res.json()) as FonteDataCadastroPjPlus;
     } catch {
-      throw new Error('Resposta inesperada da consulta FonteData (endpoint /api/cadastro-pj-plus indisponível).');
+      throw new Error('Resposta inesperada da consulta (endpoint indisponível).');
     }
     if (!data.cnpj) throw new CompanyNotFoundError(digits);
 
@@ -184,7 +183,7 @@ export class FonteDataProvider implements DataProvider {
         percentual: s.percentualParticipacao ?? undefined,
         dataEntrada: parseBrDate(s.dataEntrada),
         situacao: 'ATIVO',
-        origem: 'FonteData',
+        origem: 'Consulta por CNPJ',
         funcao: s.cargo,
       };
       if (docDigits.length === 14) {

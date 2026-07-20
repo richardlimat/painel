@@ -163,7 +163,7 @@ describe('expandNode em nó pessoa (pipeline APIFull → FonteData)', () => {
       return s === person.id;
     });
     expect(link).toBeDefined();
-    expect(link?.meta.origem).toBe('APIFull / sociedades');
+    expect(link?.meta.origem).toBe('Consulta por CPF');
     expect(link?.type).toBe('ADMINISTRADOR');
     // falha parcial: pessoa continua não-expandida (permite tentar de novo)
     expect(person.expanded).toBe(false);
