@@ -14,6 +14,7 @@ vi.mock('../services/savedQueries', () => ({
 
 import { SearchForm } from './SearchForm';
 import { useGraphStore } from '../store/graphStore';
+import { maskCNPJ } from '../lib/format';
 
 describe('SearchForm — branding e busca de CNPJ', () => {
   beforeEach(() => {
@@ -49,6 +50,20 @@ describe('SearchForm — branding e busca de CNPJ', () => {
     fireEvent.change(screen.getByPlaceholderText('00.000.000/0000-00'), { target: { value: '33.260.563/0001-78' } });
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(startSearch).toHaveBeenCalledWith('33260563000178');
+  });
+
+  it('4. apagar um dígito no MEIO do CNPJ mantém o cursor no lugar (não pula pro fim)', async () => {
+    render(<SearchForm />);
+    const input = screen.getByPlaceholderText('00.000.000/0000-00') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '33.260.563/0001-78' } });
+
+    // Apaga o "6" de "260" (índice 4) — simula posicionar o cursor ali e teclar Backspace.
+    fireEvent.change(input, { target: { value: '33.20.563/0001-78', selectionStart: 4 } });
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+
+    expect(input.value).toBe(maskCNPJ('33.20.563/0001-78'));
+    // Cursor deve continuar perto de onde o dígito foi apagado — nunca no fim da string.
+    expect(input.selectionStart).toBeLessThan(input.value.length - 3);
   });
 });
 

@@ -35,6 +35,25 @@ export function maskCPF(value: string): string {
   return out;
 }
 
+/**
+ * Posição do cursor, dentro de uma string já mascarada (CNPJ/CPF), logo após
+ * o N-ésimo dígito — usada para devolver o cursor ao lugar certo depois de
+ * reformatar em `onChange` (senão o React reposiciona pro fim do valor a
+ * cada tecla, e apagar/editar no meio do texto fica impossível). `0` dígitos
+ * antes do cursor → cursor no início.
+ */
+export function caretPositionForDigitCount(masked: string, digitCount: number): number {
+  if (digitCount <= 0) return 0;
+  let seen = 0;
+  for (let i = 0; i < masked.length; i++) {
+    if (/\d/.test(masked[i])) {
+      seen++;
+      if (seen === digitCount) return i + 1;
+    }
+  }
+  return masked.length;
+}
+
 export function isValidCNPJ(value: string): boolean {
   const d = onlyDigits(value);
   if (d.length !== 14 || /^(\d)\1{13}$/.test(d)) return false;

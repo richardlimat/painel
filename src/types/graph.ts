@@ -94,7 +94,7 @@ export interface RelationshipMeta {
   relations?: RelationType[];
   /** Texto bruto de qualificação de cada fonte que contribuiu para a relação, sem duplicar. */
   qualificacoes?: string[];
-  /** Todas as origens que confirmaram esta relação (ex.: "APIFull / sociedades", "FonteData"), sem duplicar. */
+  /** Todas as origens que confirmaram esta relação (ex.: "Consulta por CPF", "Consulta por CNPJ"), sem duplicar. */
   origens?: string[];
   /** Todas as datas de entrada distintas conhecidas, sem duplicar. */
   datasEntrada?: string[];

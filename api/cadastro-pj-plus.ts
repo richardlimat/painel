@@ -31,7 +31,7 @@ export default async function handler(req: Request): Promise<Response> {
   const apiKey = process.env.FONTEDATA_API_KEY;
   if (!apiKey) {
     return new Response(
-      JSON.stringify({ code: 'missing_api_key', message: 'FONTEDATA_API_KEY não configurada no servidor.' }),
+      JSON.stringify({ code: 'missing_api_key', message: 'Credenciais de consulta não configuradas no servidor.' }),
       { status: 500, headers: { 'content-type': 'application/json' } },
     );
   }
@@ -48,7 +48,7 @@ export default async function handler(req: Request): Promise<Response> {
     // Log de diagnóstico — nunca CNPJ, nunca corpo da resposta, nunca a chave.
     console.log('[fontedata-proxy]', { method: 'GET', status: 'unreachable', durationMs: Date.now() - startedAt });
     return new Response(
-      JSON.stringify({ code: 'upstream_unreachable', message: 'Não foi possível conectar à FonteData.' }),
+      JSON.stringify({ code: 'upstream_unreachable', message: 'Não foi possível conectar ao serviço de consulta.' }),
       { status: 502, headers: { 'content-type': 'application/json' } },
     );
   }

@@ -74,7 +74,7 @@ export default async function handler(req: Request): Promise<Response> {
 
   const authorization = process.env.APIFULL_AUTHORIZATION;
   if (!authorization) {
-    return jsonResponse({ code: 'missing_authorization', message: 'APIFULL_AUTHORIZATION não configurada no servidor.' }, 500);
+    return jsonResponse({ code: 'missing_authorization', message: 'Credenciais de consulta não configuradas no servidor.' }, 500);
   }
 
   const startedAt = Date.now();
@@ -98,8 +98,8 @@ export default async function handler(req: Request): Promise<Response> {
     });
     return jsonResponse(
       aborted
-        ? { code: 'upstream_timeout', message: 'A consulta à APIFull excedeu o tempo limite.' }
-        : { code: 'upstream_unreachable', message: 'Não foi possível conectar à APIFull.' },
+        ? { code: 'upstream_timeout', message: 'A consulta excedeu o tempo limite.' }
+        : { code: 'upstream_unreachable', message: 'Não foi possível conectar ao serviço de consulta.' },
       aborted ? 504 : 502,
     );
   } finally {

@@ -35,20 +35,20 @@ function messageForStatus(status: number, detail: string | undefined): string {
       return `CPF ou parâmetro inválido.${suffix}`;
     case 401:
     case 403:
-      return `Chave de API da APIFull ausente ou inválida (configuração do servidor).${suffix}`;
+      return `Chave de API ausente ou inválida (configuração do servidor).${suffix}`;
     case 402:
-      return `Saldo insuficiente na conta APIFull.${suffix}`;
+      return `Saldo insuficiente para consulta.${suffix}`;
     case 413:
       return `Requisição rejeitada pelo servidor (corpo excede o tamanho permitido).${suffix}`;
     case 429:
-      return `Limite de requisições da APIFull excedido. Tente novamente em instantes.${suffix}`;
+      return `Limite de requisições excedido. Tente novamente em instantes.${suffix}`;
     case 502:
-      return `Não foi possível conectar à APIFull.${suffix}`;
+      return `Não foi possível conectar ao serviço de consulta.${suffix}`;
     case 504:
-      return `A consulta à APIFull excedeu o tempo limite.${suffix}`;
+      return `A consulta excedeu o tempo limite.${suffix}`;
     default:
-      if (status >= 500 && status <= 503) return `APIFull indisponível no momento.${suffix}`;
-      return `Falha na consulta APIFull (HTTP ${status})${suffix}`;
+      if (status >= 500 && status <= 503) return `Serviço de consulta indisponível no momento.${suffix}`;
+      return `Falha na consulta (HTTP ${status})${suffix}`;
   }
 }
 
@@ -92,11 +92,11 @@ export async function getApiFullProfile(cpf: string): Promise<ApiFullProfile> {
   try {
     data = await res.json();
   } catch {
-    throw new Error('Resposta inesperada da consulta APIFull (endpoint /api/cpf-ultra indisponível).');
+    throw new Error('Resposta inesperada da consulta (endpoint indisponível).');
   }
 
   if (!isValidApiFullBody(data)) {
-    throw new Error('Consulta à APIFull sem sucesso ou em formato inesperado.');
+    throw new Error('Consulta sem sucesso ou em formato inesperado.');
   }
 
   return { SERVICE_RESPONSE: data.dados.SERVICE_RESPONSE };
