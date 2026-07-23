@@ -319,6 +319,61 @@ describe('EntityDetail — aba "Financeiro & Consumo" (cockpit + cartões)', () 
   });
 });
 
+describe('EntityDetail — aba "Presença & Viagens" (pegada digital)', () => {
+  const PRES_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      viagens: [{ destino: 'Lisboa', pais: 'Portugal', data: '2023-07-10', companhia: 'TAP' }],
+      movimentacoesOnline: [
+        {
+          email: 'x@y.com',
+          fonte: 'GOOGLE_MAPS',
+          fotos: [{ url: PLACE_PHOTO_URL, local: 'Praça Central', endereco: 'Rua A, 1' }],
+          perfil: { nome: 'Fulano', nivel: 5, nomeNivel: 'Nível 5', pontosTotal: 1200 },
+          reviews: [{ local: 'Restaurante X', nota: 4 }],
+          contribuicoes: [],
+        },
+      ],
+      estrangeiro: { situacao: 'Naturalizado', pais_origem: 'Argentina' },
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, PRES_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('monta a pegada digital com resumo, Local Guide e situação migratória', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Presença & Viagens/ }));
+    expect(screen.getByText(/Pegada digital/)).toBeInTheDocument();
+    expect(screen.getByText(/Local Guide · Nível 5/)).toBeInTheDocument();
+    expect(screen.getByText('Situação migratória registrada')).toBeInTheDocument();
+  });
+
+  it('fotos do Google Maps viram miniatura clicável e nada é omitido', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Presença & Viagens/ }));
+    // foto vira thumbnail (nunca URL crua)
+    expect(screen.queryByText(PLACE_PHOTO_URL)).not.toBeInTheDocument();
+    const thumb = screen.getByRole('button', { name: /Ampliar imagem/ });
+    expect(thumb.querySelector('img')).toHaveAttribute('src', PLACE_PHOTO_URL);
+    // caption/campos do lugar e da viagem preservados
+    expect(screen.getByText('Praça Central')).toBeInTheDocument();
+    expect(screen.getByText('Lisboa')).toBeInTheDocument();
+  });
+});
+
 describe('EntityDetail — aba "Bens & Patrimônio" (inventário)', () => {
   const PAT_PROFILE: ApiFullProfile = {
     SERVICE_RESPONSE: {
