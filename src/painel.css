@@ -2793,3 +2793,209 @@
     display: none;
   }
 }
+
+/* ─── Aba "Contatos & Endereços" — dossiê com visão geral calculada ────── */
+.ct-overview {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px 22px;
+  margin-bottom: 18px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.ct-overview::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #4f46e5, #7c3aed 40%, #059669);
+}
+.ct-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.ct-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+.ct-tile {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 15px;
+  background: linear-gradient(180deg, var(--c-soft), var(--panel) 70%);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.ct-tile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+.ct-tile-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--c-soft);
+  color: var(--c);
+  border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
+}
+.ct-tile-value {
+  display: block;
+  margin-top: 10px;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.ct-tile-label {
+  display: block;
+  margin-top: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ct-highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--line);
+}
+.ct-hl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 650;
+  border-radius: 999px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+}
+.ct-hl-wa {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+}
+.ct-hl-alert {
+  color: #b45309;
+  background: #fffbeb;
+  border-color: #fde68a;
+}
+.ct-hl-city {
+  color: #334155;
+  background: #f1f5f9;
+  border-color: var(--line);
+}
+
+/* Filtros */
+.ct-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.ct-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: #475569;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 650;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.ct-filter:hover {
+  border-color: #cbd5e1;
+  transform: translateY(-1px);
+}
+.ct-filter.active {
+  border-color: #0f172a;
+  background: #0f172a;
+  color: #fff;
+}
+.ct-filter-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+.ct-filter-count {
+  font-size: 10.5px;
+  font-weight: 700;
+  background: rgba(100, 116, 139, 0.16);
+  color: inherit;
+  border-radius: 999px;
+  padding: 1px 7px;
+  min-width: 18px;
+  text-align: center;
+}
+.ct-filter.active .ct-filter-count {
+  background: rgba(255, 255, 255, 0.22);
+}
+
+/* Domínios */
+.ct-domain {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 4px 22px 10px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+.ct-domain::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--c);
+}
+.ct-domain-head {
+  padding: 18px 0 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ct-domain-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.ct-domain-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.ct-domain-body {
+  padding-top: 20px;
+}
+.ct-domain-body .ef-section:last-child {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .ct-domain {
+    padding: 4px 16px 10px;
+  }
+  .ct-domain-sub {
+    display: none;
+  }
+}

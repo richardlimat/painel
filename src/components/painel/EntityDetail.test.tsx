@@ -203,6 +203,16 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
     expect(screen.getByText('Ddd')).toBeInTheDocument();
   });
 
+  it('a aba "Contatos & Endereços" traz a visão geral calculada e os dois domínios', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Contatos & Endereços/ }));
+    expect(screen.getByText('Visão geral dos contatos')).toBeInTheDocument();
+    expect(screen.getByText('Formas de contato')).toBeInTheDocument();
+    expect(screen.getByText('Localização & vínculos')).toBeInTheDocument();
+    // seções continuam presentes por padrão (filtro "Todos") — nada é escondido
+    expect(screen.getByRole('button', { name: /^Telefones/ })).toBeInTheDocument();
+  });
+
   it('cards de parente trazem a tag de vínculo (Filho/Sócio/…)', () => {
     render(<EntityDetail />);
     expect(screen.getByText('Filho')).toBeInTheDocument();

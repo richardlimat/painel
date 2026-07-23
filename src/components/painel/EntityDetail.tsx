@@ -10,6 +10,7 @@ import { valueMatchesQuery } from './ProfileValue';
 import { ProfileSectionView } from './ProfileSections';
 import { PersonTimeline } from './PersonTimeline';
 import { CadastralPage } from './CadastralPage';
+import { ContactsPage } from './ContactsPage';
 import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
@@ -309,6 +310,13 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
               <PersonTimeline items={Array.isArray(sr.linhaDoTempo) ? (sr.linhaDoTempo as unknown[]) : []} />
             ) : PROFILE_PAGES[activePage]?.name === 'Cadastral & Civil' ? (
               <CadastralPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Contatos & Endereços' ? (
+              <ContactsPage
                 sections={activeSections}
                 serviceResponse={sr}
                 onOpenImage={setLightboxSrc}
