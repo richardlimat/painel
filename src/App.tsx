@@ -66,25 +66,17 @@ export default function App() {
           <button
             type="button"
             onClick={() => void logout()}
-            className="group flex items-center gap-1.5 rounded-lg border border-red-500/40 bg-red-500/10 px-3.5 py-1.5 text-xs font-bold uppercase tracking-wide text-red-500 shadow-sm shadow-red-500/10 transition hover:border-red-500 hover:bg-red-500 hover:text-white hover:shadow-md hover:shadow-red-500/30 active:scale-95 dark:text-red-400 dark:hover:text-white"
+            className="group flex flex-none items-center gap-2 rounded-full bg-white py-1 pl-1 pr-4 text-xs font-extrabold uppercase tracking-wide text-red-500 shadow-md shadow-slate-900/10 ring-1 ring-slate-900/5 transition hover:shadow-lg hover:shadow-red-500/20 active:scale-95 dark:bg-slate-800 dark:text-red-400 dark:ring-white/10"
           >
-            <svg
-              viewBox="0 0 24 24"
-              width="14"
-              height="14"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              className="transition group-hover:translate-x-0.5"
-            >
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <path d="M16 17l5-5-5-5" />
-              <path d="M21 12H9" />
-            </svg>
+            <span className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-red-50 text-red-500 transition group-hover:bg-red-500 group-hover:text-white dark:bg-red-500/10 dark:text-red-400">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="3">
+                <path d="M9 5l6 7-6 7" />
+              </svg>
+            </span>
             Sair
           </button>
         </div>
-        <div className="min-h-0 flex-1">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {view === 'saved' ? (
             <SavedQueriesList onBack={() => setView('search')} />
           ) : (
