@@ -161,7 +161,7 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
     expect(screen.getByText('accounts.google.com')).toBeInTheDocument();
     expect(container.textContent).not.toContain(RAW_PASSWORD);
 
-    const revealBtn = container.querySelector('.ef-leak-pass .profile-reveal');
+    const revealBtn = container.querySelector('.cy-pass .profile-reveal');
     expect(revealBtn).toBeTruthy();
     fireEvent.click(revealBtn as Element);
     expect(container.textContent).toContain(RAW_PASSWORD);
@@ -316,6 +316,57 @@ describe('EntityDetail — aba "Financeiro & Consumo" (cockpit + cartões)', () 
     expect(screen.getByText('2023')).toBeInTheDocument();
     // "numeroRecibo" é campo não curado do registro de IRPF
     expect(screen.getByText('Numero Recibo')).toBeInTheDocument();
+  });
+});
+
+describe('EntityDetail — aba "Cyber Sec & Vazamentos" (central de ameaças)', () => {
+  const CYBER_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      credenciaisVazadas: [
+        {
+          tipo: 'EMAIL',
+          valor: 'fulano@example.com',
+          origem: 'Coleção #1',
+          resultados: [
+            { host: 'accounts.google.com', url: 'https://accounts.google.com/x', login: 'fulano@example.com', password: 'iade0509', file_date: '2024-01-01', hash: 'abc123' },
+          ],
+        },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, CYBER_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('console acusa exposição e mede a força da senha sem revelá-la', () => {
+    const { container } = render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Cyber Sec & Vazamentos/ }));
+    expect(screen.getByText('Exposição detectada')).toBeInTheDocument();
+    // força derivada (8 caracteres) aparece sem expor a senha
+    expect(screen.getByText(/8 caract\./)).toBeInTheDocument();
+    expect(container.textContent).not.toContain('iade0509');
+  });
+
+  it('não perde campos não previstos do alvo nem do breach', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Cyber Sec & Vazamentos/ }));
+    // "origem" é chave do alvo fora do conjunto tipo/valor/resultados
+    expect(screen.getByText('Origem')).toBeInTheDocument();
+    // "hash" é chave do breach fora de host/url/login/password/file_date
+    expect(screen.getByText('Hash')).toBeInTheDocument();
   });
 });
 
