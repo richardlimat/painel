@@ -3291,3 +3291,204 @@
   .fin-irpf-item { grid-template-columns: 56px 1fr; gap: 10px; }
   .fin-irpf::before { left: 30px; }
 }
+
+/* ─── Aba "Carreira & Negócios" — dossiê de trajetória profissional ────── */
+.car-hero {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.car-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #7c3aed, #2563eb 45%, #0891b2);
+}
+.car-eyebrow {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+.car-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+.car-tile {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 15px;
+  background: linear-gradient(180deg, var(--c-soft), var(--panel) 72%);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.car-tile:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08); }
+.car-tile-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--c-soft);
+  color: var(--c);
+  border: 1px solid color-mix(in srgb, var(--c) 20%, transparent);
+}
+.car-tile-value { display: block; margin-top: 10px; font-size: 24px; font-weight: 800; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.car-tile-label { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.car-badges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px dashed var(--line); }
+.car-hl {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 650;
+  border-radius: 999px;
+  padding: 6px 12px;
+  border: 1px solid transparent;
+}
+.car-hl.tone-alert { color: #b91c1c; background: #fef2f2; border-color: #fecaca; }
+.car-hl.tone-accent { color: #6d28d9; background: #f5f3ff; border-color: #ddd6fe; }
+.car-hl.tone-info { color: #334155; background: #f1f5f9; border-color: var(--line); }
+
+/* Trajetória */
+.car-journey { margin-bottom: 22px; }
+.car-journey-head { margin-bottom: 16px; }
+.car-journey-title { margin: 0; font-size: 17px; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); }
+.car-journey-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.car-track { position: relative; }
+.car-track::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 17px;
+  width: 2px;
+  background: linear-gradient(180deg, #e2e8f0, #cbd5e1 45%, #e2e8f0);
+}
+.car-item { position: relative; display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: start; margin-bottom: 14px; }
+.car-node {
+  grid-column: 1;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  margin-top: 3px;
+  z-index: 1;
+}
+.car-card {
+  grid-column: 2;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+}
+.car-card:hover { transform: translateY(-2px); box-shadow: 0 12px 26px rgba(15, 23, 42, 0.1); border-color: #d1d9e3; }
+.car-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
+.car-badge { font-size: 10px; font-weight: 800; letter-spacing: 0.05em; text-transform: uppercase; padding: 3px 9px; border-radius: 999px; }
+.car-range { font-size: 12px; font-weight: 650; color: #334155; font-variant-numeric: tabular-nums; }
+.car-live {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 999px;
+  padding: 2px 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.car-live::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  animation: car-pulse 1.8s infinite;
+}
+@keyframes car-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+}
+.car-card-title { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); }
+.car-card-role { margin-top: 2px; font-size: 13px; color: #475569; }
+.car-status {
+  display: inline-block;
+  margin-top: 8px;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+}
+.car-status.ok { color: #047857; background: #ecfdf5; }
+.car-status.off { color: #b45309; background: #fffbeb; }
+.car-kv { display: flex; flex-wrap: wrap; gap: 10px 22px; margin-top: 12px; }
+.car-kv-item { display: flex; flex-direction: column; gap: 2px; }
+.car-kv-item small { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; }
+.car-kv-item b { font-size: 13.5px; font-weight: 650; color: var(--ink); }
+.car-extra {
+  margin-top: 12px;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fafbfc;
+}
+.car-extra .ef-grid { gap: 10px; }
+
+/* Empty */
+.car-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 48px 24px;
+  border: 1px dashed var(--line);
+  border-radius: 16px;
+  background: #fafbfc;
+}
+.car-empty-icon { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: #f1f5f9; color: #94a3b8; margin-bottom: 4px; }
+.car-empty-title { margin: 0; font-size: 15px; font-weight: 700; color: #334155; }
+.car-empty-sub { margin: 0; font-size: 13px; color: var(--muted); }
+
+/* Domínios */
+.car-domain {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 4px 22px 10px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+.car-domain::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--c); }
+.car-domain-head { padding: 18px 0 14px; border-bottom: 1px solid var(--line); }
+.car-domain-title { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); }
+.car-domain-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.car-domain-body { padding-top: 20px; }
+.car-domain-body .ef-section:last-child { margin-bottom: 8px; }
+
+@media (max-width: 640px) {
+  .car-domain { padding: 4px 16px 10px; }
+  .car-domain-sub { display: none; }
+}

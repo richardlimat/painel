@@ -319,6 +319,68 @@ describe('EntityDetail — aba "Financeiro & Consumo" (cockpit + cartões)', () 
   });
 });
 
+describe('EntityDetail — aba "Carreira & Negócios" (trajetória)', () => {
+  const CAR_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      sociedades: [
+        { razao_social: 'WRV LTDA', cnpj: '21819440000145', qualificacao_socio_descricao: 'Sócio-Administrador', situacao_cadastral: 'ATIVA', dt_entrada: '09/03/2021', capitalSocial: 50000 },
+      ],
+      empregos: [
+        { razao_social: 'ALPHA S/A', descricao_cbo: 'Analista', salario: 4200, data_admissao: '01/02/2015', data_demissao: '30/06/2019', cnpj_empregador: '11222333000181', matricula: 'A-77' },
+      ],
+      rais: [
+        { razao_social: 'BETA ME', cnpj: '99888777000166', ano_base: 2014, admissao: '2014-03-01', demissao_tratada: '2014-12-20' },
+      ],
+      ppe: [{ cargo: 'Assessor', orgao: 'Prefeitura' }],
+      inscricoesOab: [{ numero: '12345', uf: 'AL' }],
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, CAR_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('funde sociedades, empregos e RAIS numa trajetória única', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Carreira & Negócios/ }));
+    expect(screen.getByText('Trajetória profissional')).toBeInTheDocument();
+    expect(screen.getByText('WRV LTDA')).toBeInTheDocument();
+    expect(screen.getByText('ALPHA S/A')).toBeInTheDocument();
+    expect(screen.getByText('BETA ME')).toBeInTheDocument();
+    // panorama acusa exposição política
+    expect(screen.getByText('Politicamente exposta (PPE)')).toBeInTheDocument();
+  });
+
+  it('não perde nenhum campo dos registros da trajetória (curados e não curados)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Carreira & Negócios/ }));
+    // campo curado não usado no "rosto" do cartão (salário do emprego)
+    expect(screen.getByText('Salário')).toBeInTheDocument();
+    // campo NÃO curado do emprego — nada é omitido
+    expect(screen.getByText('Matricula')).toBeInTheDocument();
+    // campo não curado da sociedade
+    expect(screen.getByText('Capital Social')).toBeInTheDocument();
+  });
+
+  it('mantém a seção "Conexões no mapa" injetada', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Carreira & Negócios/ }));
+    expect(screen.getByText('Conexões no mapa')).toBeInTheDocument();
+  });
+});
+
 describe('EntityDetail — sem nó selecionado', () => {
   afterEach(() => cleanup());
   it('não renderiza nada quando nenhum nó está selecionado', () => {

@@ -12,6 +12,7 @@ import { PersonTimeline } from './PersonTimeline';
 import { CadastralPage } from './CadastralPage';
 import { ContactsPage } from './ContactsPage';
 import { FinancePage } from './FinancePage';
+import { CareerPage } from './CareerPage';
 import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
@@ -330,6 +331,21 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
                 onOpenImage={setLightboxSrc}
                 onConsult={onConsult}
               />
+            ) : PROFILE_PAGES[activePage]?.name === 'Carreira & Negócios' ? (
+              <CareerPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+                connectionsSlot={
+                  <section className="ef-section">
+                    <h3 className="ef-section-title">
+                      Conexões no mapa<span className="ef-count">{related.length}</span>
+                    </h3>
+                    <Connections related={related} onGo={onGo} />
+                  </section>
+                }
+              />
             ) : (
               <>
                 {activeSections.map((spec, i) => (
@@ -342,14 +358,6 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
                     onConsult={onConsult}
                   />
                 ))}
-                {PROFILE_PAGES[activePage]?.name === 'Carreira & Negócios' && (
-                  <section className="ef-section">
-                    <h3 className="ef-section-title">
-                      Conexões no mapa<span className="ef-count">{related.length}</span>
-                    </h3>
-                    <Connections related={related} onGo={onGo} />
-                  </section>
-                )}
               </>
             )}
           </div>
