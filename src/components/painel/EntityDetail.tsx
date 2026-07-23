@@ -14,6 +14,7 @@ import { ContactsPage } from './ContactsPage';
 import { FinancePage } from './FinancePage';
 import { CareerPage } from './CareerPage';
 import { CyberPage } from './CyberPage';
+import { PatrimonioPage } from './PatrimonioPage';
 import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
@@ -338,6 +339,12 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
                 serviceResponse={sr}
                 onOpenImage={setLightboxSrc}
                 onConsult={onConsult}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Bens & Patrimônio' ? (
+              <PatrimonioPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
               />
             ) : PROFILE_PAGES[activePage]?.name === 'Carreira & Negócios' ? (
               <CareerPage

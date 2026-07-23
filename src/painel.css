@@ -3749,3 +3749,186 @@
   .cy-domain { padding: 4px 16px 10px; }
   .cy-domain-sub { display: none; }
 }
+
+/* ─── Aba "Bens & Patrimônio" — inventário de bens ────────────────────── */
+.pt-vault {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) 1fr;
+  gap: 18px;
+  align-items: center;
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(37, 99, 235, 0.08), transparent 55%),
+    var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.pt-vault::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #2563eb, #059669 40%, #7c3aed 70%, #ea580c);
+}
+.pt-vault-brand { display: flex; align-items: center; gap: 14px; }
+.pt-vault-icon {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #1e293b, #0f172a);
+  color: #7dd3fc;
+}
+.pt-vault-eyebrow { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.pt-vault-total { display: flex; align-items: baseline; gap: 8px; margin-top: 2px; }
+.pt-vault-total b { font-size: 30px; font-weight: 800; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pt-vault-total span { font-size: 12.5px; color: var(--muted); }
+.pt-vault-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 12px; }
+.pt-vault-tile {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 13px 14px;
+  background: linear-gradient(180deg, var(--c-soft), var(--panel) 72%);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.pt-vault-tile:hover { transform: translateY(-2px); box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08); }
+.pt-vault-tile-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: var(--c-soft);
+  color: var(--c);
+  border: 1px solid color-mix(in srgb, var(--c) 20%, transparent);
+}
+.pt-vault-tile b { display: block; margin-top: 9px; font-size: 22px; font-weight: 800; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pt-vault-tile small { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+
+/* Coleções */
+.pt-collection {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 4px 22px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+.pt-collection::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: var(--c); }
+.pt-collection-head { display: flex; align-items: center; gap: 14px; padding: 18px 0 16px; border-bottom: 1px solid var(--line); }
+.pt-collection-icon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--c-soft);
+  color: var(--c);
+}
+.pt-collection-titles { flex: 1; min-width: 0; }
+.pt-collection-title { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); }
+.pt-collection-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.pt-collection-count {
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--c);
+  background: var(--c-soft);
+  border-radius: 999px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.pt-collection > .ef-empty { margin-top: 18px; }
+.pt-collection > .ef-chips, .pt-collection > .ef-records { margin-top: 18px; }
+
+/* Cartões de ativo */
+.pt-assets {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+.pt-asset {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--panel);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
+}
+.pt-asset:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgba(15, 23, 42, 0.1); }
+.pt-asset-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: linear-gradient(135deg, var(--c-soft), var(--panel) 85%);
+  border-bottom: 1px solid var(--line);
+}
+.pt-asset-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  display: grid;
+  place-items: center;
+  background: var(--c);
+  color: #fff;
+}
+.pt-asset-index { flex: 1; font-size: 12.5px; font-weight: 800; letter-spacing: 0.02em; text-transform: uppercase; color: var(--c); }
+.pt-asset-body { padding: 14px; }
+.pt-asset-body .ef-grid { gap: 10px; }
+
+/* Placa estilo Mercosul */
+.pt-plate {
+  flex: none;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 96px;
+  border: 2px solid #1f2937;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.15);
+}
+.pt-plate-top {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-align: center;
+  color: #fff;
+  background: #1e3a8a;
+  padding: 1px 0;
+}
+.pt-plate-num {
+  font-family: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  color: #111827;
+  padding: 3px 8px;
+}
+
+@media (max-width: 720px) {
+  .pt-vault { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .pt-collection { padding: 4px 16px 16px; }
+  .pt-collection-sub { display: none; }
+  .pt-assets { grid-template-columns: 1fr; }
+}

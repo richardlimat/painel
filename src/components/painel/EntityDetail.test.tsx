@@ -319,6 +319,52 @@ describe('EntityDetail — aba "Financeiro & Consumo" (cockpit + cartões)', () 
   });
 });
 
+describe('EntityDetail — aba "Bens & Patrimônio" (inventário)', () => {
+  const PAT_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      placas: [
+        { placa: 'ABC1D23', marca: 'VW', modelo: 'Nivus', ano: 2022, cor: 'Prata', chassi: '9BW...' },
+      ],
+      aeronaves: [
+        { matricula: 'PT-XYZ', fabricante: 'Embraer', modelo: 'Phenom 300' },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, PAT_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('monta o inventário com as coleções de bens e a placa promovida', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Bens & Patrimônio/ }));
+    expect(screen.getByText('Inventário de bens')).toBeInTheDocument();
+    expect(screen.getByText('ABC1D23')).toBeInTheDocument(); // placa
+    expect(screen.getByText('PT-XYZ')).toBeInTheDocument(); // aeronave (via ProfileCardEntries)
+  });
+
+  it('não perde nenhum campo do veículo (curados e não previstos)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Bens & Patrimônio/ }));
+    // demais campos do veículo aparecem no corpo do cartão (campos exclusivos do veículo)
+    expect(screen.getByText('Marca')).toBeInTheDocument();
+    expect(screen.getByText('Cor')).toBeInTheDocument();
+    expect(screen.getByText('Chassi')).toBeInTheDocument();
+  });
+});
+
 describe('EntityDetail — aba "Cyber Sec & Vazamentos" (central de ameaças)', () => {
   const CYBER_PROFILE: ApiFullProfile = {
     SERVICE_RESPONSE: {
