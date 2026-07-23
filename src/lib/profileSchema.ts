@@ -1,11 +1,11 @@
 /**
  * Dicionário de campos do perfil de pessoa (APIFull). Substitui o agrupamento
  * genérico por palavra-chave: aqui cada chave de nível superior de
- * `SERVICE_RESPONSE` é mapeada explicitamente para uma das 8 páginas, numa
+ * `SERVICE_RESPONSE` é mapeada explicitamente para uma das 9 páginas, numa
  * seção nomeada, com rótulos em pt-BR e o renderizador adequado.
  *
  * Nada é descartado: qualquer chave de nível superior que NÃO apareça em
- * nenhuma seção abaixo cai automaticamente na página "Saúde & Outros" via
+ * nenhuma seção abaixo cai automaticamente na página "Saúde" via
  * `unmappedGenericSections` — inclusive uma chave nova/desconhecida que a API
  * venha a adicionar no futuro.
  */
@@ -277,7 +277,7 @@ export const PROFILE_PAGES: PageSpec[] = [
     ],
   },
   {
-    name: 'Saúde & Outros',
+    name: 'Saúde',
     sections: [
       { title: 'Vacinas', source: 'vacinas', kind: 'list', fields: [
         { label: 'Vacina', path: 'vacina_nome' },
@@ -295,10 +295,23 @@ export const PROFILE_PAGES: PageSpec[] = [
       { title: 'Processos judiciais', source: 'processos', kind: 'generic', alwaysShow: true, emptyText: 'Nenhum processo judicial encontrado.' },
       { title: 'Peças / mandados (BNMP)', source: 'pecasBnmp', kind: 'generic' },
       { title: 'Vínculos por processos', source: 'vinculosPorProcessos', kind: 'generic' },
+    ],
+  },
+  {
+    name: 'Timeline',
+    sections: [
       { title: 'Linha do tempo', source: 'linhaDoTempo', kind: 'timeline', alwaysShow: true, emptyText: 'Sem eventos na linha do tempo.' },
     ],
   },
 ];
+
+/**
+ * Página que recebe as chaves de nível superior não mapeadas por nenhuma
+ * seção (ver `unmappedGenericSections`) — não é necessariamente a última
+ * página da lista, então referenciamos pelo nome para não jogar dados soltos
+ * na aba "Timeline", que é puramente cronológica.
+ */
+export const UNMAPPED_PAGE_NAME = 'Saúde';
 
 function fmtLocalidadeFromContato(item: unknown): string {
   const e = (item as { endereco?: Record<string, unknown> } | null)?.endereco;
@@ -352,7 +365,7 @@ export function collectUsedSources(): Set<string> {
 /**
  * Seções sintéticas (genéricas) para qualquer chave de nível superior de
  * `serviceResponse` que não esteja em nenhuma seção — anexadas ao fim da
- * última página ("Saúde & Outros") para garantir que nada é perdido.
+ * página "Saúde" (ver `UNMAPPED_PAGE_NAME`) para garantir que nada é perdido.
  */
 export function unmappedGenericSections(serviceResponse: Record<string, unknown>): SectionSpec[] {
   const used = collectUsedSources();

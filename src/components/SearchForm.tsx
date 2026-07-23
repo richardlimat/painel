@@ -105,13 +105,30 @@ function RecentQueries({ onOpenAll }: { onOpenAll?: () => void }) {
       </ul>
 
       {onOpenAll && (
-        <button
-          type="button"
-          onClick={onOpenAll}
-          className="mt-3 text-xs font-medium text-slate-500 hover:underline dark:text-slate-400"
-        >
-          Ver todas as consultas salvas
-        </button>
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={onOpenAll}
+            className="group flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-xs font-bold uppercase tracking-wide text-slate-600 shadow-sm transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:border-cyan-500/40 dark:hover:bg-slate-700 dark:hover:text-cyan-300"
+          >
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 4h16v16H4z" />
+              <path d="M8 4v16M4 9h4" />
+            </svg>
+            Ver todas as consultas salvas
+            <svg
+              viewBox="0 0 24 24"
+              width="12"
+              height="12"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              className="transition group-hover:translate-x-0.5"
+            >
+              <path d="M9 6l6 6-6 6" />
+            </svg>
+          </button>
+        </div>
       )}
     </div>
   );
