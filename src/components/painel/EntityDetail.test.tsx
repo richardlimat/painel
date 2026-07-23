@@ -263,6 +263,62 @@ describe('EntityDetail — empresa em página única', () => {
   });
 });
 
+describe('EntityDetail — aba "Financeiro & Consumo" (cockpit + cartões)', () => {
+  const FIN_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      contasBancos: [
+        { banco: 'Banco do Brasil', agencia: '1234', conta: '567890', codBanco: '001', tipoConta: 'Corrente' },
+      ],
+      irpf: [
+        { ano: 2023, situacao: 'Restituído', lote: '3', banco: 'Caixa', agencia: '0001', dt_lote: '2023-08-31', numeroRecibo: 'REC-9' },
+      ],
+      ccf: [{ ocorrencia: 1 }],
+      propensoes: { cpf: PERSON_CPF, csb8: 5, csb8_faixa: 'B', propensaoCartao: 1, propensaoViagem: 0 },
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, FIN_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('cockpit acusa o sinal de risco quando há cheque sem fundo', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Financeiro & Consumo/ }));
+    expect(screen.getByText('1 sinal de atenção')).toBeInTheDocument();
+    // "Consta" aparece na célula de sinal de cheques sem fundo
+    expect(screen.getAllByText('Consta').length).toBeGreaterThan(0);
+  });
+
+  it('conta bancária vira cartão sem perder nenhum campo (inclusive os não curados)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Financeiro & Consumo/ }));
+    expect(screen.getByText('Banco do Brasil')).toBeInTheDocument();
+    // "tipoConta" não está no conjunto curado, mas nada é omitido (rótulo presente)
+    expect(screen.getByText('Tipo Conta')).toBeInTheDocument();
+  });
+
+  it('IRPF vira linha de restituições e mantém os campos não curados', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Financeiro & Consumo/ }));
+    expect(screen.getByText('Restituído')).toBeInTheDocument();
+    expect(screen.getByText('2023')).toBeInTheDocument();
+    // "numeroRecibo" é campo não curado do registro de IRPF
+    expect(screen.getByText('Numero Recibo')).toBeInTheDocument();
+  });
+});
+
 describe('EntityDetail — sem nó selecionado', () => {
   afterEach(() => cleanup());
   it('não renderiza nada quando nenhum nó está selecionado', () => {

@@ -11,6 +11,7 @@ import { ProfileSectionView } from './ProfileSections';
 import { PersonTimeline } from './PersonTimeline';
 import { CadastralPage } from './CadastralPage';
 import { ContactsPage } from './ContactsPage';
+import { FinancePage } from './FinancePage';
 import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
@@ -317,6 +318,13 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
               />
             ) : PROFILE_PAGES[activePage]?.name === 'Contatos & Endereços' ? (
               <ContactsPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Financeiro & Consumo' ? (
+              <FinancePage
                 sections={activeSections}
                 serviceResponse={sr}
                 onOpenImage={setLightboxSrc}

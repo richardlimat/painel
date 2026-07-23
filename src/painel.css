@@ -2999,3 +2999,295 @@
     display: none;
   }
 }
+
+/* ─── Aba "Financeiro & Consumo" — cockpit de inteligência financeira ──── */
+.fin-cockpit {
+  display: grid;
+  grid-template-columns: minmax(230px, 300px) 1fr;
+  gap: 18px;
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(56, 189, 248, 0.14), transparent 55%),
+    linear-gradient(135deg, #0b1220 0%, #111c30 55%, #1a2740 100%);
+  border-radius: 20px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 20px 44px rgba(11, 18, 32, 0.32);
+}
+.fin-verdict {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  border-radius: 16px;
+  padding: 20px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.fin-verdict::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background: radial-gradient(90% 90% at 20% 10%, currentColor, transparent 60%);
+  pointer-events: none;
+}
+.fin-verdict.tone-green { background: linear-gradient(160deg, rgba(16, 185, 129, 0.22), rgba(16, 185, 129, 0.05)); color: #6ee7b7; }
+.fin-verdict.tone-amber { background: linear-gradient(160deg, rgba(245, 158, 11, 0.24), rgba(245, 158, 11, 0.05)); color: #fcd34d; }
+.fin-verdict.tone-red { background: linear-gradient(160deg, rgba(239, 68, 68, 0.26), rgba(239, 68, 68, 0.05)); color: #fca5a5; }
+.fin-verdict-badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  color: inherit;
+  position: relative;
+  z-index: 1;
+}
+.fin-verdict-text {
+  position: relative;
+  z-index: 1;
+}
+.fin-verdict-text b {
+  display: block;
+  font-size: 18px;
+  font-weight: 800;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+.fin-verdict-text small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #cbd5e1;
+}
+.fin-signals {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
+  gap: 10px;
+}
+.fin-signal {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 12px;
+  padding: 11px 12px;
+  transition: transform 0.14s ease, background 0.14s ease;
+}
+.fin-signal:hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.08);
+}
+.fin-signal-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+}
+.fin-signal-value {
+  display: block;
+  margin-top: 9px;
+  font-size: 19px;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #e2e8f0;
+  font-variant-numeric: tabular-nums;
+}
+.fin-signal-label {
+  display: block;
+  margin-top: 2px;
+  font-size: 10.5px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.fin-signal.tone-info .fin-signal-icon { background: rgba(56, 189, 248, 0.16); color: #7dd3fc; }
+.fin-signal.tone-info .fin-signal-value { color: #bae6fd; }
+.fin-signal.tone-ok .fin-signal-icon { background: rgba(16, 185, 129, 0.16); color: #6ee7b7; }
+.fin-signal.tone-ok .fin-signal-value { color: #6ee7b7; font-size: 15px; }
+.fin-signal.tone-risk .fin-signal-icon { background: rgba(239, 68, 68, 0.18); color: #fca5a5; }
+.fin-signal.tone-risk .fin-signal-value { color: #fca5a5; font-size: 15px; }
+.fin-signal.tone-warn .fin-signal-icon { background: rgba(245, 158, 11, 0.18); color: #fcd34d; }
+.fin-signal.tone-warn .fin-signal-value { color: #fcd34d; }
+.fin-signal.tone-accent .fin-signal-icon { background: rgba(167, 139, 250, 0.2); color: #c4b5fd; }
+.fin-signal.tone-accent .fin-signal-value { color: #c4b5fd; }
+
+/* Filtros de domínio */
+.fin-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+.fin-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: #475569;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 650;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease, transform 0.1s ease;
+}
+.fin-filter:hover { border-color: #cbd5e1; transform: translateY(-1px); }
+.fin-filter.active { border-color: #0f172a; background: #0f172a; color: #fff; }
+.fin-filter-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+/* Domínios */
+.fin-domain {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 4px 22px 10px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+.fin-domain::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--c);
+}
+.fin-domain-head { padding: 18px 0 14px; border-bottom: 1px solid var(--line); }
+.fin-domain-title { margin: 0; font-size: 16px; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); }
+.fin-domain-sub { margin: 2px 0 0; font-size: 12.5px; color: var(--muted); }
+.fin-domain-body { padding-top: 20px; }
+.fin-domain-body .ef-section:last-child { margin-bottom: 8px; }
+
+/* Cartões de conta bancária */
+.fin-banks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.fin-bank { display: flex; flex-direction: column; gap: 10px; }
+.fin-bank-face {
+  position: relative;
+  border-radius: 16px;
+  padding: 16px 18px;
+  min-height: 158px;
+  display: flex;
+  flex-direction: column;
+  color: #fff;
+  background:
+    radial-gradient(120% 120% at 100% 0%, rgba(255, 255, 255, 0.16), transparent 55%),
+    linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #0ea5e9 100%);
+  box-shadow: 0 14px 30px rgba(30, 58, 138, 0.28);
+  overflow: hidden;
+}
+.fin-bank-face::after {
+  content: '';
+  position: absolute;
+  right: -30px;
+  bottom: -50px;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+.fin-bank-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; position: relative; z-index: 1; }
+.fin-bank-name { font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+.fin-bank-cod {
+  font-size: 10.5px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 3px 9px;
+  white-space: nowrap;
+}
+.fin-bank-chip { margin: 14px 0 auto; color: rgba(255, 255, 255, 0.85); position: relative; z-index: 1; }
+.fin-bank-number {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  position: relative;
+  z-index: 1;
+}
+.fin-bank-number .profile-masked { gap: 8px; }
+.fin-bank-foot { display: flex; align-items: flex-end; justify-content: space-between; margin-top: 10px; position: relative; z-index: 1; }
+.fin-bank-foot small { display: block; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.08em; color: rgba(255, 255, 255, 0.7); }
+.fin-bank-foot b { font-size: 14px; font-weight: 700; }
+.fin-bank-brand { opacity: 0.85; }
+.fin-extra {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #fafbfc;
+}
+.fin-extra .ef-grid { gap: 10px; }
+
+/* Linha de restituições de IRPF */
+.fin-irpf { position: relative; display: flex; flex-direction: column; gap: 14px; padding-left: 6px; }
+.fin-irpf::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 40px;
+  width: 2px;
+  background: linear-gradient(#e2e8f0, #cbd5e1, #e2e8f0);
+}
+.fin-irpf-item { display: grid; grid-template-columns: 70px 1fr; gap: 16px; align-items: start; }
+.fin-irpf-year {
+  position: relative;
+  z-index: 1;
+  font-size: 15px;
+  font-weight: 800;
+  color: #fff;
+  background: #0f172a;
+  border-radius: 999px;
+  padding: 6px 0;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.18);
+}
+.fin-irpf-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.05);
+}
+.fin-irpf-status {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+.fin-irpf-status.tone-ok { color: #047857; background: #ecfdf5; }
+.fin-irpf-status.tone-warn { color: #b45309; background: #fffbeb; }
+.fin-irpf-status.tone-info { color: #1d4ed8; background: #eff6ff; }
+.fin-kv { display: flex; flex-wrap: wrap; gap: 8px 22px; }
+.fin-kv-item { display: flex; flex-direction: column; gap: 2px; }
+.fin-kv-item small { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; }
+.fin-kv-item b { font-size: 13.5px; font-weight: 650; color: var(--ink); }
+.fin-irpf-card .fin-extra { margin-top: 12px; }
+
+@media (max-width: 720px) {
+  .fin-cockpit { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .fin-domain { padding: 4px 16px 10px; }
+  .fin-domain-sub { display: none; }
+  .fin-irpf-item { grid-template-columns: 56px 1fr; gap: 10px; }
+  .fin-irpf::before { left: 30px; }
+}
