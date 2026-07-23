@@ -2671,3 +2671,125 @@
     justify-content: center;
   }
 }
+
+/* ─── Aba "Cadastral & Civil" — seções agrupadas em clusters temáticos ─── */
+.cad-nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px 0 14px;
+  margin-bottom: 6px;
+  background: linear-gradient(#f5f6f8 72%, rgba(245, 246, 248, 0));
+}
+.cad-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: #475569;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 12.5px;
+  font-weight: 650;
+  transition: border-color 0.15s ease, color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+}
+.cad-chip:hover {
+  border-color: #cbd5e1;
+  color: #0f172a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+.cad-chip-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.cad-cluster {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 4px 22px 8px;
+  margin-bottom: 18px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  scroll-margin-top: 64px;
+  overflow: hidden;
+}
+.cad-cluster::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--c);
+}
+.cad-cluster-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 0 16px;
+  border-bottom: 1px solid var(--line);
+}
+.cad-cluster-icon {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  background: var(--c-soft);
+  color: var(--c);
+}
+.cad-cluster-titles {
+  flex: 1;
+  min-width: 0;
+}
+.cad-cluster-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.cad-cluster-sub {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.cad-cluster-count {
+  flex: none;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--c);
+  background: var(--c-soft);
+  border-radius: 999px;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.cad-cluster-body {
+  padding-top: 22px;
+}
+/* Dentro do cluster as seções perdem o respiro extra do rodapé (o card já dá) */
+.cad-cluster-body .ef-section:last-child {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .cad-cluster {
+    padding: 4px 16px 8px;
+  }
+  .cad-cluster-sub {
+    display: none;
+  }
+}

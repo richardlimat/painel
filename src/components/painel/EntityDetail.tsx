@@ -9,6 +9,7 @@ import { ImageLightbox } from './ImageLightbox';
 import { valueMatchesQuery } from './ProfileValue';
 import { ProfileSectionView } from './ProfileSections';
 import { PersonTimeline } from './PersonTimeline';
+import { CadastralPage } from './CadastralPage';
 import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
@@ -306,6 +307,13 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
               )
             ) : PROFILE_PAGES[activePage]?.name === 'Timeline' ? (
               <PersonTimeline items={Array.isArray(sr.linhaDoTempo) ? (sr.linhaDoTempo as unknown[]) : []} />
+            ) : PROFILE_PAGES[activePage]?.name === 'Cadastral & Civil' ? (
+              <CadastralPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+              />
             ) : (
               <>
                 {activeSections.map((spec, i) => (
