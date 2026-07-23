@@ -117,7 +117,8 @@ const PAGE_LABELS = [
   'Cyber Sec & Vazamentos',
   'Presença & Viagens',
   'Bens & Patrimônio',
-  'Saúde & Outros',
+  'Saúde',
+  'Timeline',
 ];
 
 describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', () => {
@@ -127,7 +128,7 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
   });
   afterEach(() => cleanup());
 
-  it('renderiza as 8 abas nomeadas na ordem pedida', () => {
+  it('renderiza as 9 abas nomeadas na ordem pedida', () => {
     render(<EntityDetail />);
     for (const l of PAGE_LABELS) {
       expect(screen.getByRole('button', { name: new RegExp(l) })).toBeInTheDocument();
@@ -213,6 +214,18 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
     render(<EntityDetail />);
     fireEvent.click(screen.getByRole('button', { name: 'Consultar' }));
     expect(startPersonSearch).toHaveBeenCalledWith(PARENTE_CPF);
+  });
+
+  it('a aba "Timeline" mostra a linha do tempo (resumo + evento com HTML removido)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Timeline/ }));
+    // Cabeçalho/resumo da nova página
+    expect(screen.getByText('Linha do tempo')).toBeInTheDocument();
+    // Evento: HTML da descrição é removido antes de exibir
+    expect(screen.getByText('Nascimento de Fulano')).toBeInTheDocument();
+    // A "Linha do tempo" saiu da aba "Saúde"
+    fireEvent.click(screen.getByRole('button', { name: /Saúde/ }));
+    expect(screen.queryByText('Nascimento de Fulano')).not.toBeInTheDocument();
   });
 });
 

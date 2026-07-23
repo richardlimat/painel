@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useGraphStore } from '../../store/graphStore';
 import { usePersonProfileStore } from '../../store/personProfileStore';
 import { formatCNPJ, formatCPF, formatCurrency, formatDate, normalizeText } from '../../lib/format';
-import { PROFILE_PAGES, PROFILE_PAGE_NAMES, unmappedGenericSections, type SectionSpec } from '../../lib/profileSchema';
+import { PROFILE_PAGES, PROFILE_PAGE_NAMES, UNMAPPED_PAGE_NAME, unmappedGenericSections, type SectionSpec } from '../../lib/profileSchema';
 import { RELATION_LABELS } from '../../lib/colors';
 import { CompanyIcon, PersonIcon } from '../flow/icons';
 import { ImageLightbox } from './ImageLightbox';
 import { valueMatchesQuery } from './ProfileValue';
 import { ProfileSectionView } from './ProfileSections';
+import { PersonTimeline } from './PersonTimeline';
 import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
@@ -16,10 +17,10 @@ const nid = (v: string | GraphNode) => (typeof v === 'string' ? v : v.id);
 /** Abas exibidas (desabilitadas) enquanto o perfil ainda carrega — evita o layout "pular". */
 const NAV_PLACEHOLDER = PROFILE_PAGE_NAMES;
 
-/** Seções de uma página (a última recebe as chaves não mapeadas, p/ nada se perder). */
+/** Seções de uma página (a página "Saúde" recebe as chaves não mapeadas, p/ nada se perder). */
 function sectionsForPage(pageIndex: number, sr: Record<string, unknown>): SectionSpec[] {
   const base = PROFILE_PAGES[pageIndex]?.sections ?? [];
-  if (pageIndex === PROFILE_PAGES.length - 1) return [...base, ...unmappedGenericSections(sr)];
+  if (PROFILE_PAGES[pageIndex]?.name === UNMAPPED_PAGE_NAME) return [...base, ...unmappedGenericSections(sr)];
   return base;
 }
 
@@ -303,6 +304,8 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
                   />
                 ))
               )
+            ) : PROFILE_PAGES[activePage]?.name === 'Timeline' ? (
+              <PersonTimeline items={Array.isArray(sr.linhaDoTempo) ? (sr.linhaDoTempo as unknown[]) : []} />
             ) : (
               <>
                 {activeSections.map((spec, i) => (
@@ -338,9 +341,9 @@ const isEmpty = (v: unknown) => v == null || v === '' || String(v).toLowerCase()
 
 /**
  * Detalhe da entidade em TELA CHEIA (substitui o antigo painel lateral). Ao
- * clicar num nó do mapa, sobrepõe o app inteiro: pessoa em 8 páginas/abas
- * temáticas; empresa numa página única e estruturada. O × (ou clicar numa
- * conexão) volta ao mapa.
+ * clicar num nó do mapa, sobrepõe o app inteiro: pessoa em 9 páginas/abas
+ * temáticas (incluindo a "Timeline"); empresa numa página única e
+ * estruturada. O × (ou clicar numa conexão) volta ao mapa.
  */
 export function EntityDetail() {
   const selectedNodeId = useGraphStore((s) => s.selectedNodeId);
