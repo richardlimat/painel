@@ -95,7 +95,7 @@ export default function App() {
         onNavigateToSearch={() => setView('search')}
         onNavigateToSaved={() => setView('saved')}
       />
-      <FiltersSidebar open={leftOpen} onCollapse={() => setLeftOpen(false)} />
+      <FiltersSidebar open={leftOpen} onToggle={() => setLeftOpen((v) => !v)} />
       <Workspace workspaceRef={workspaceRef} />
       <EntityDetail />
     </div>

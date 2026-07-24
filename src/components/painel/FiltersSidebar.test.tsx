@@ -55,11 +55,22 @@ describe('FiltersSidebar', () => {
     expect(screen.getByText('Legenda')).toBeInTheDocument();
   });
 
-  it('6. o botão "Recolher filtros" (dentro do quadro) dispara onCollapse', () => {
-    const onCollapse = vi.fn();
-    render(<FiltersSidebar open onCollapse={onCollapse} />);
+  it('6. o botão "Recolher filtros" (dentro do quadro) dispara onToggle', () => {
+    const onToggle = vi.fn();
+    render(<FiltersSidebar open onToggle={onToggle} />);
     fireEvent.click(screen.getByLabelText('Recolher filtros'));
-    expect(onCollapse).toHaveBeenCalledTimes(1);
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('7. recolhido, vira um trilho com botão de reabrir no mesmo lugar (dispara onToggle)', () => {
+    const onToggle = vi.fn();
+    render(<FiltersSidebar open={false} onToggle={onToggle} />);
+    // conteúdo do painel some; sobra o trilho para reabrir
+    expect(screen.queryByText('Estado (UF)')).not.toBeInTheDocument();
+    const rail = screen.getByLabelText('Expandir filtros da rede');
+    expect(rail).toBeInTheDocument();
+    fireEvent.click(rail);
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
   describe('busca de CNAE digitável', () => {

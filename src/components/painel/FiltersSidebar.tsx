@@ -95,7 +95,7 @@ function FilterRow({
   );
 }
 
-export function FiltersSidebar({ open, onCollapse }: { open: boolean; onCollapse?: () => void }) {
+export function FiltersSidebar({ open, onToggle }: { open: boolean; onToggle?: () => void }) {
   const filters = useGraphStore((s) => s.filters);
   const setFilters = useGraphStore((s) => s.setFilters);
   const resetFilters = useGraphStore((s) => s.resetFilters);
@@ -113,8 +113,31 @@ export function FiltersSidebar({ open, onCollapse }: { open: boolean; onCollapse
     return [...m.entries()].sort();
   }, [nodes]);
 
+  // Recolhido: vira um trilho fino no MESMO lugar, com o botão de reabrir no topo.
+  if (!open) {
+    return (
+      <aside className="filters collapsed" id="filters">
+        <button
+          type="button"
+          className="filters-rail"
+          onClick={() => onToggle?.()}
+          title="Expandir filtros da rede"
+          aria-label="Expandir filtros da rede"
+        >
+          <span className="filters-rail-btn">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 6l6 6-6 6" />
+              <path d="M6 6l6 6-6 6" />
+            </svg>
+          </span>
+          <span className="filters-rail-label">Filtros da rede</span>
+        </button>
+      </aside>
+    );
+  }
+
   return (
-    <aside className={`filters ${open ? 'open' : ''}`} id="filters">
+    <aside className="filters open" id="filters">
       <div className="section-title">
         <b>Filtros da rede</b>
         <div className="section-title-actions">
@@ -124,7 +147,7 @@ export function FiltersSidebar({ open, onCollapse }: { open: boolean; onCollapse
           <button
             type="button"
             className="filters-collapse"
-            onClick={() => onCollapse?.()}
+            onClick={() => onToggle?.()}
             title="Recolher filtros"
             aria-label="Recolher filtros"
           >

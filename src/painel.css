@@ -52,15 +52,14 @@
   transition: grid-template-columns 0.25s ease;
 }
 .app.left-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr) 348px;
+  grid-template-columns: 46px minmax(0, 1fr) 348px;
 }
 .app.right-collapsed {
   grid-template-columns: 250px minmax(0, 1fr) 0px;
 }
 .app.left-collapsed.right-collapsed {
-  grid-template-columns: 0px minmax(0, 1fr) 0px;
+  grid-template-columns: 46px minmax(0, 1fr) 0px;
 }
-.app.left-collapsed .filters,
 .app.right-collapsed .details {
   opacity: 0;
   pointer-events: none;
@@ -257,6 +256,58 @@
   background: #f3f4f6;
   color: var(--ink);
   border-color: #cbd5e1;
+}
+
+/* Trilho fino do painel recolhido — reabre no mesmo lugar */
+.filters.collapsed {
+  padding: 0;
+  overflow: hidden;
+}
+.filters-rail {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 0;
+  cursor: pointer;
+  color: var(--muted);
+  transition: background 0.16s ease, color 0.16s ease;
+}
+.filters-rail:hover {
+  background: #f3f4f6;
+  color: var(--ink);
+}
+.filters-rail-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  color: inherit;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+  transition: border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.filters-rail:hover .filters-rail-btn {
+  border-color: var(--blue);
+  color: var(--blue);
+  box-shadow: 0 4px 10px rgba(22, 113, 249, 0.18);
+}
+.filters-rail-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: inherit;
+  white-space: nowrap;
 }
 .filter-row {
   display: flex;
@@ -1257,7 +1308,7 @@
     grid-template-columns: 220px minmax(0, 1fr) 310px;
   }
   .app.left-collapsed {
-    grid-template-columns: 0px minmax(0, 1fr) 310px;
+    grid-template-columns: 46px minmax(0, 1fr) 310px;
   }
   .app.right-collapsed {
     grid-template-columns: 220px minmax(0, 1fr) 0px;
