@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { SESSION_COOKIE_NAME, hashToken } from './session';
+import { SESSION_COOKIE_NAME } from './session';
 
 const { getSupabaseClientMock } = vi.hoisted(() => ({ getSupabaseClientMock: vi.fn() }));
 vi.mock('./supabase', () => ({ getSupabaseClient: getSupabaseClientMock }));
@@ -45,7 +45,6 @@ describe('requireSession', () => {
 
   it('2. sessão válida + usuário ativo retorna ok com userId', async () => {
     const token = 'token-valido';
-    const tokenHash = await hashToken(token);
     getSupabaseClientMock.mockReturnValue(
       makeSupabaseMock({
         sessions: [

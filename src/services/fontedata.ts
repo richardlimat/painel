@@ -7,6 +7,7 @@ import type {
 } from '../types/graph';
 import { onlyDigits } from '../lib/format';
 import { CompanyNotFoundError, DataProvider, ReverseLookupUnsupportedError } from './provider';
+import { readNeutralErrorMessage } from './proxyError';
 
 interface FonteDataEmail {
   enderecoEmail: string;
@@ -92,42 +93,6 @@ function formatEndereco(e?: FonteDataEndereco): string | undefined {
   return [e.logradouro, e.numero, e.bairro].filter(Boolean).join(', ') || undefined;
 }
 
-/** Extrai a mensagem de erro do corpo da resposta (JSON ou texto), quando houver */
-export async function extractErrorDetail(res: Response): Promise<string | undefined> {
-  try {
-    const body = await res.clone().json();
-    const msg = body?.message ?? body?.mensagem ?? body?.erro ?? body?.error ?? body;
-    if (msg == null) return undefined;
-    return typeof msg === 'string' ? msg : JSON.stringify(msg);
-  } catch {
-    try {
-      const text = await res.clone().text();
-      return text || undefined;
-    } catch {
-      return undefined;
-    }
-  }
-}
-
-/** Mensagem amigável por status HTTP (sempre com o detalhe real do corpo anexado, quando houver) */
-function messageForStatus(status: number, detail: string | undefined): string {
-  const suffix = detail ? ` Detalhe: ${detail}` : '';
-  switch (status) {
-    case 400:
-      return `CNPJ ou parâmetro inválido.${suffix}`;
-    case 401:
-    case 403:
-      return `Chave de API ausente ou inválida (configuração do servidor).${suffix}`;
-    case 402:
-      return `Saldo insuficiente para consulta.${suffix}`;
-    case 429:
-      return `Limite de requisições excedido. Tente novamente em instantes.${suffix}`;
-    default:
-      if (status >= 500 && status <= 503) return `Serviço de consulta indisponível no momento.${suffix}`;
-      return `Falha na consulta (HTTP ${status})${suffix}`;
-  }
-}
-
 /**
  * Provedor comercial de dados cadastrais de pessoas jurídicas. Suporta
  * consulta de CNPJ + QSA; não suporta busca reversa por CPF.
@@ -145,7 +110,7 @@ export class FonteDataProvider implements DataProvider {
     if (!/^\d{14}$/.test(digits)) {
       throw new Error('CNPJ inválido: informe exatamente 14 dígitos.');
     }
-    const cacheKey = `cadastro-pj-plus:${digits}`;
+    const cacheKey = `empresa:${digits}`;
     const cached = this.companyCache.get(cacheKey);
     if (cached) return cached;
 
@@ -158,19 +123,18 @@ export class FonteDataProvider implements DataProvider {
   }
 
   private async fetchCompany(digits: string): Promise<CompanyLookupResult> {
-    // Chamada same-origin: o proxy em api/cadastro-pj-plus.ts repassa para a
+    // Chamada same-origin: o proxy em api/consulta-empresa.ts repassa para a
     // FonteData no servidor, evitando CORS e mantendo a chave fora do bundle.
-    const res = await fetch(`/api/cadastro-pj-plus?CNPJ=${digits}`);
+    const res = await fetch(`/api/consulta-empresa?CNPJ=${digits}`);
     if (res.status === 404) throw new CompanyNotFoundError(digits);
     if (!res.ok) {
-      const detail = await extractErrorDetail(res);
-      throw new Error(messageForStatus(res.status, detail));
+      throw new Error(await readNeutralErrorMessage(res));
     }
     let data: FonteDataCadastroPjPlus;
     try {
       data = (await res.json()) as FonteDataCadastroPjPlus;
     } catch {
-      throw new Error('Resposta inesperada da consulta (endpoint indisponível).');
+      throw new Error('Não foi possível processar a resposta da consulta.');
     }
     if (!data.cnpj) throw new CompanyNotFoundError(digits);
 
@@ -227,6 +191,6 @@ export class FonteDataProvider implements DataProvider {
   }
 
   async getPersonCompanies(): Promise<PersonLookupResult> {
-    throw new ReverseLookupUnsupportedError(this.name);
+    throw new ReverseLookupUnsupportedError();
   }
 }

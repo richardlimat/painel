@@ -20,11 +20,8 @@ export interface DataProvider {
 }
 
 export class ReverseLookupUnsupportedError extends Error {
-  constructor(providerName: string) {
-    super(
-      `O provedor "${providerName}" não suporta busca reversa CPF → empresas. ` +
-        'Use o modo demonstração ou configure um provedor comercial.',
-    );
+  constructor() {
+    super('Esta busca não está disponível para o tipo de documento informado.');
     this.name = 'ReverseLookupUnsupportedError';
   }
 }

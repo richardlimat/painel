@@ -261,6 +261,22 @@ describe('EntityDetail — empresa em página única', () => {
     fireEvent.click(screen.getByRole('button', { name: /FULANO DE TAL/ }));
     expect(useGraphStore.getState().selectedNodeId).toBe(PERSON_NODE.id);
   });
+
+  it('AUDITORIA DE NEUTRALIDADE: razão social pesquisada que coincide com nome de fornecedor de dados é exibida intacta, sem alteração (o produto nunca adultera conteúdo legítimo pesquisado)', () => {
+    const vendorLikeCompany: GraphNode = {
+      ...COMPANY_NODE,
+      label: 'FONTEDATA CONSULTORIA EMPRESARIAL LTDA',
+      company: {
+        ...COMPANY_NODE.company!,
+        razaoSocial: 'FONTEDATA CONSULTORIA EMPRESARIAL LTDA',
+        nomeFantasia: 'APIFULL SOLUÇÕES',
+      },
+    };
+    selectNode(vendorLikeCompany, [PERSON_NODE], []);
+    render(<EntityDetail />);
+    expect(screen.getAllByText('FONTEDATA CONSULTORIA EMPRESARIAL LTDA').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('APIFULL SOLUÇÕES').length).toBeGreaterThan(0);
+  });
 });
 
 describe('EntityDetail — aba "Financeiro & Consumo" (cockpit + cartões)', () => {

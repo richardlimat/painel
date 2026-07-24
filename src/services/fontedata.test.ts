@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { onlyDigits } from '../lib/format';
-import { extractErrorDetail, FonteDataProvider } from './fontedata';
+import { FonteDataProvider } from './fontedata';
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -87,19 +87,15 @@ describe('FonteDataProvider.getCompany', () => {
     expect(result.company.cnpj).toBe(VALID_CNPJ);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
-});
 
-describe('extractErrorDetail', () => {
-  it('serializa corpo-objeto em vez de virar "[object Object]" (regressão)', async () => {
-    const res = jsonResponse({ code: 'invalid_parameters', message: { CNPJ: ['inválido'] } }, 400);
-    const detail = await extractErrorDetail(res);
-    expect(detail).toBe(JSON.stringify({ CNPJ: ['inválido'] }));
-    expect(detail).not.toContain('[object Object]');
-  });
-
-  it('retorna a string diretamente quando message já é string', async () => {
-    const res = jsonResponse({ message: 'CNPJ inválido' }, 400);
-    const detail = await extractErrorDetail(res);
-    expect(detail).toBe('CNPJ inválido');
+  it('erro do proxy nunca expõe nome de fornecedor, saldo ou chave — só a mensagem já neutralizada pelo servidor', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse(
+        { code: 'service_unavailable', message: 'Serviço temporariamente indisponível.', id: 'ab12cd34' },
+        401,
+      ),
+    );
+    const provider = new FonteDataProvider();
+    await expect(provider.getCompany(VALID_CNPJ)).rejects.toThrow('Serviço temporariamente indisponível.');
   });
 });
