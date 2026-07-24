@@ -9,6 +9,12 @@ body,
   margin: 0;
   font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   overscroll-behavior: none;
+  background-color: #f1f5f9;
+}
+
+html.dark,
+html.dark body {
+  background-color: #020617;
 }
 
 /* barra de rolagem discreta nos painéis */

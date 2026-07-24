@@ -55,7 +55,11 @@ export function LoginForm() {
                   id="email"
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) => setEmail(e.target.value.toLowerCase().replace(/\s/g, ''))}
+                  onKeyDown={(e) => {
+                    if (e.key === ' ') e.preventDefault();
+                  }}
+                  autoCapitalize="off"
                   autoComplete="username"
                   className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"
                   autoFocus
@@ -80,7 +84,10 @@ export function LoginForm() {
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) => setPassword(e.target.value.replace(/\s/g, ''))}
+                  onKeyDown={(e) => {
+                    if (e.key === ' ') e.preventDefault();
+                  }}
                   autoComplete="current-password"
                   className="min-w-0 flex-1 border-0 bg-transparent text-sm text-slate-900 placeholder-slate-300 focus:outline-none dark:text-white"
                   required
@@ -113,11 +120,18 @@ export function LoginForm() {
 
             <button
               type="submit"
-              disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-blue-500/30 transition hover:bg-blue-600 disabled:opacity-50"
+              disabled={submitting || !email.trim() || !password.trim()}
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-500 py-3 text-sm font-bold uppercase tracking-wide text-white shadow-lg shadow-blue-500/30 transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
             >
               {submitting ? (
-                'Entrando…'
+                <>
+                  <span
+                    role="status"
+                    aria-label="Carregando"
+                    className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+                  />
+                  Entrando…
+                </>
               ) : (
                 <>
                   Entrar

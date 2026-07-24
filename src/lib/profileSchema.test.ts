@@ -3,7 +3,7 @@ import { PROFILE_PAGE_NAMES, PROFILE_PAGES, collectUsedSources, unmappedGenericS
 import { fmtCtps, fmtDate, fmtMoney, fmtObito, fmtRg, fmtSexo, getPath, isEmptyValue } from './profileFormat';
 
 describe('profileSchema', () => {
-  it('define exatamente as 8 páginas na ordem pedida', () => {
+  it('define exatamente as 9 páginas na ordem pedida', () => {
     expect(PROFILE_PAGE_NAMES).toEqual([
       'Cadastral & Civil',
       'Contatos & Endereços',
@@ -12,7 +12,8 @@ describe('profileSchema', () => {
       'Cyber Sec & Vazamentos',
       'Presença & Viagens',
       'Bens & Patrimônio',
-      'Saúde & Outros',
+      'Saúde',
+      'Timeline',
     ]);
   });
 
@@ -26,7 +27,8 @@ describe('profileSchema', () => {
     expect(sourcesByPage['Carreira & Negócios']).toEqual(expect.arrayContaining(['sociedades', 'empregos', 'rais', 'politica']));
     expect(sourcesByPage['Cyber Sec & Vazamentos']).toEqual(expect.arrayContaining(['credenciaisVazadas', 'vazamentos']));
     expect(sourcesByPage['Bens & Patrimônio']).toEqual(expect.arrayContaining(['placas', 'aeronaves']));
-    expect(sourcesByPage['Saúde & Outros']).toEqual(expect.arrayContaining(['vacinas', 'processos', 'linhaDoTempo']));
+    expect(sourcesByPage['Saúde']).toEqual(expect.arrayContaining(['vacinas', 'processos']));
+    expect(sourcesByPage['Timeline']).toEqual(['linhaDoTempo']);
   });
 
   it('chave desconhecida cai em seção genérica (nada é descartado)', () => {

@@ -117,7 +117,8 @@ const PAGE_LABELS = [
   'Cyber Sec & Vazamentos',
   'Presença & Viagens',
   'Bens & Patrimônio',
-  'Saúde & Outros',
+  'Saúde',
+  'Timeline',
 ];
 
 describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', () => {
@@ -127,7 +128,7 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
   });
   afterEach(() => cleanup());
 
-  it('renderiza as 8 abas nomeadas na ordem pedida', () => {
+  it('renderiza as 9 abas nomeadas na ordem pedida', () => {
     render(<EntityDetail />);
     for (const l of PAGE_LABELS) {
       expect(screen.getByRole('button', { name: new RegExp(l) })).toBeInTheDocument();
@@ -160,7 +161,7 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
     expect(screen.getByText('accounts.google.com')).toBeInTheDocument();
     expect(container.textContent).not.toContain(RAW_PASSWORD);
 
-    const revealBtn = container.querySelector('.ef-leak-pass .profile-reveal');
+    const revealBtn = container.querySelector('.cy-pass .profile-reveal');
     expect(revealBtn).toBeTruthy();
     fireEvent.click(revealBtn as Element);
     expect(container.textContent).toContain(RAW_PASSWORD);
@@ -202,6 +203,16 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
     expect(screen.getByText('Ddd')).toBeInTheDocument();
   });
 
+  it('a aba "Contatos & Endereços" traz a visão geral calculada e os dois domínios', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Contatos & Endereços/ }));
+    expect(screen.getByText('Visão geral dos contatos')).toBeInTheDocument();
+    expect(screen.getByText('Formas de contato')).toBeInTheDocument();
+    expect(screen.getByText('Localização & vínculos')).toBeInTheDocument();
+    // seções continuam presentes por padrão (filtro "Todos") — nada é escondido
+    expect(screen.getByRole('button', { name: /^Telefones/ })).toBeInTheDocument();
+  });
+
   it('cards de parente trazem a tag de vínculo (Filho/Sócio/…)', () => {
     render(<EntityDetail />);
     expect(screen.getByText('Filho')).toBeInTheDocument();
@@ -213,6 +224,18 @@ describe('EntityDetail — pessoa em tela cheia com o dicionário de campos', ()
     render(<EntityDetail />);
     fireEvent.click(screen.getByRole('button', { name: 'Consultar' }));
     expect(startPersonSearch).toHaveBeenCalledWith(PARENTE_CPF);
+  });
+
+  it('a aba "Timeline" mostra a linha do tempo (resumo + evento com HTML removido)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Timeline/ }));
+    // Cabeçalho/resumo da nova página
+    expect(screen.getByText('Linha do tempo')).toBeInTheDocument();
+    // Evento: HTML da descrição é removido antes de exibir
+    expect(screen.getByText('Nascimento de Fulano')).toBeInTheDocument();
+    // A "Linha do tempo" saiu da aba "Saúde"
+    fireEvent.click(screen.getByRole('button', { name: /Saúde/ }));
+    expect(screen.queryByText('Nascimento de Fulano')).not.toBeInTheDocument();
   });
 });
 
@@ -237,6 +260,276 @@ describe('EntityDetail — empresa em página única', () => {
     render(<EntityDetail />);
     fireEvent.click(screen.getByRole('button', { name: /FULANO DE TAL/ }));
     expect(useGraphStore.getState().selectedNodeId).toBe(PERSON_NODE.id);
+  });
+});
+
+describe('EntityDetail — aba "Financeiro & Consumo" (cockpit + cartões)', () => {
+  const FIN_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      contasBancos: [
+        { banco: 'Banco do Brasil', agencia: '1234', conta: '567890', codBanco: '001', tipoConta: 'Corrente' },
+      ],
+      irpf: [
+        { ano: 2023, situacao: 'Restituído', lote: '3', banco: 'Caixa', agencia: '0001', dt_lote: '2023-08-31', numeroRecibo: 'REC-9' },
+      ],
+      ccf: [{ ocorrencia: 1 }],
+      propensoes: { cpf: PERSON_CPF, csb8: 5, csb8_faixa: 'B', propensaoCartao: 1, propensaoViagem: 0 },
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, FIN_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('cockpit acusa o sinal de risco quando há cheque sem fundo', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Financeiro & Consumo/ }));
+    expect(screen.getByText('1 sinal de atenção')).toBeInTheDocument();
+    // "Consta" aparece na célula de sinal de cheques sem fundo
+    expect(screen.getAllByText('Consta').length).toBeGreaterThan(0);
+  });
+
+  it('conta bancária vira cartão sem perder nenhum campo (inclusive os não curados)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Financeiro & Consumo/ }));
+    expect(screen.getByText('Banco do Brasil')).toBeInTheDocument();
+    // "tipoConta" não está no conjunto curado, mas nada é omitido (rótulo presente)
+    expect(screen.getByText('Tipo Conta')).toBeInTheDocument();
+  });
+
+  it('IRPF vira linha de restituições e mantém os campos não curados', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Financeiro & Consumo/ }));
+    expect(screen.getByText('Restituído')).toBeInTheDocument();
+    expect(screen.getByText('2023')).toBeInTheDocument();
+    // "numeroRecibo" é campo não curado do registro de IRPF
+    expect(screen.getByText('Numero Recibo')).toBeInTheDocument();
+  });
+});
+
+describe('EntityDetail — aba "Presença & Viagens" (pegada digital)', () => {
+  const PRES_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      viagens: [{ destino: 'Lisboa', pais: 'Portugal', data: '2023-07-10', companhia: 'TAP' }],
+      movimentacoesOnline: [
+        {
+          email: 'x@y.com',
+          fonte: 'GOOGLE_MAPS',
+          fotos: [{ url: PLACE_PHOTO_URL, local: 'Praça Central', endereco: 'Rua A, 1' }],
+          perfil: { nome: 'Fulano', nivel: 5, nomeNivel: 'Nível 5', pontosTotal: 1200 },
+          reviews: [{ local: 'Restaurante X', nota: 4 }],
+          contribuicoes: [],
+        },
+      ],
+      estrangeiro: { situacao: 'Naturalizado', pais_origem: 'Argentina' },
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, PRES_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('monta a pegada digital com resumo, Local Guide e situação migratória', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Presença & Viagens/ }));
+    expect(screen.getByText(/Pegada digital/)).toBeInTheDocument();
+    expect(screen.getByText(/Local Guide · Nível 5/)).toBeInTheDocument();
+    expect(screen.getByText('Situação migratória registrada')).toBeInTheDocument();
+  });
+
+  it('fotos do Google Maps viram miniatura clicável e nada é omitido', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Presença & Viagens/ }));
+    // foto vira thumbnail (nunca URL crua)
+    expect(screen.queryByText(PLACE_PHOTO_URL)).not.toBeInTheDocument();
+    const thumb = screen.getByRole('button', { name: /Ampliar imagem/ });
+    expect(thumb.querySelector('img')).toHaveAttribute('src', PLACE_PHOTO_URL);
+    // caption/campos do lugar e da viagem preservados
+    expect(screen.getByText('Praça Central')).toBeInTheDocument();
+    expect(screen.getByText('Lisboa')).toBeInTheDocument();
+  });
+});
+
+describe('EntityDetail — aba "Bens & Patrimônio" (inventário)', () => {
+  const PAT_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      placas: [
+        { placa: 'ABC1D23', marca: 'VW', modelo: 'Nivus', ano: 2022, cor: 'Prata', chassi: '9BW...' },
+      ],
+      aeronaves: [
+        { matricula: 'PT-XYZ', fabricante: 'Embraer', modelo: 'Phenom 300' },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, PAT_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('monta o inventário com as coleções de bens e a placa promovida', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Bens & Patrimônio/ }));
+    expect(screen.getByText('Inventário de bens')).toBeInTheDocument();
+    expect(screen.getByText('ABC1D23')).toBeInTheDocument(); // placa
+    expect(screen.getByText('PT-XYZ')).toBeInTheDocument(); // aeronave (via ProfileCardEntries)
+  });
+
+  it('não perde nenhum campo do veículo (curados e não previstos)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Bens & Patrimônio/ }));
+    // demais campos do veículo aparecem no corpo do cartão (campos exclusivos do veículo)
+    expect(screen.getByText('Marca')).toBeInTheDocument();
+    expect(screen.getByText('Cor')).toBeInTheDocument();
+    expect(screen.getByText('Chassi')).toBeInTheDocument();
+  });
+});
+
+describe('EntityDetail — aba "Cyber Sec & Vazamentos" (central de ameaças)', () => {
+  const CYBER_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      credenciaisVazadas: [
+        {
+          tipo: 'EMAIL',
+          valor: 'fulano@example.com',
+          origem: 'Coleção #1',
+          resultados: [
+            { host: 'accounts.google.com', url: 'https://accounts.google.com/x', login: 'fulano@example.com', password: 'iade0509', file_date: '2024-01-01', hash: 'abc123' },
+          ],
+        },
+      ],
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, CYBER_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('console acusa exposição e mede a força da senha sem revelá-la', () => {
+    const { container } = render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Cyber Sec & Vazamentos/ }));
+    expect(screen.getByText('Exposição detectada')).toBeInTheDocument();
+    // força derivada (8 caracteres) aparece sem expor a senha
+    expect(screen.getByText(/8 caract\./)).toBeInTheDocument();
+    expect(container.textContent).not.toContain('iade0509');
+  });
+
+  it('não perde campos não previstos do alvo nem do breach', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Cyber Sec & Vazamentos/ }));
+    // "origem" é chave do alvo fora do conjunto tipo/valor/resultados
+    expect(screen.getByText('Origem')).toBeInTheDocument();
+    // "hash" é chave do breach fora de host/url/login/password/file_date
+    expect(screen.getByText('Hash')).toBeInTheDocument();
+  });
+});
+
+describe('EntityDetail — aba "Carreira & Negócios" (trajetória)', () => {
+  const CAR_PROFILE: ApiFullProfile = {
+    SERVICE_RESPONSE: {
+      sociedades: [
+        { razao_social: 'WRV LTDA', cnpj: '21819440000145', qualificacao_socio_descricao: 'Sócio-Administrador', situacao_cadastral: 'ATIVA', dt_entrada: '09/03/2021', capitalSocial: 50000 },
+      ],
+      empregos: [
+        { razao_social: 'ALPHA S/A', descricao_cbo: 'Analista', salario: 4200, data_admissao: '01/02/2015', data_demissao: '30/06/2019', cnpj_empregador: '11222333000181', matricula: 'A-77' },
+      ],
+      rais: [
+        { razao_social: 'BETA ME', cnpj: '99888777000166', ano_base: 2014, admissao: '2014-03-01', demissao_tratada: '2014-12-20' },
+      ],
+      ppe: [{ cargo: 'Assessor', orgao: 'Prefeitura' }],
+      inscricoesOab: [{ numero: '12345', uf: 'AL' }],
+    },
+  };
+
+  beforeEach(() => {
+    usePersonProfileStore.setState({
+      profilesByCpf: new Map([[PERSON_CPF, CAR_PROFILE]]),
+      requestsByCpf: new Map(),
+      errorsByCpf: new Map(),
+      sociedadesStatusByCpf: new Map(),
+      queue: [],
+      processing: false,
+      queueTotal: 0,
+      queueDone: 0,
+      queueFailed: 0,
+    });
+    selectNode(PERSON_NODE);
+  });
+  afterEach(() => cleanup());
+
+  it('funde sociedades, empregos e RAIS numa trajetória única', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Carreira & Negócios/ }));
+    expect(screen.getByText('Trajetória profissional')).toBeInTheDocument();
+    expect(screen.getByText('WRV LTDA')).toBeInTheDocument();
+    expect(screen.getByText('ALPHA S/A')).toBeInTheDocument();
+    expect(screen.getByText('BETA ME')).toBeInTheDocument();
+    // panorama acusa exposição política
+    expect(screen.getByText('Politicamente exposta (PPE)')).toBeInTheDocument();
+  });
+
+  it('não perde nenhum campo dos registros da trajetória (curados e não curados)', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Carreira & Negócios/ }));
+    // campo curado não usado no "rosto" do cartão (salário do emprego)
+    expect(screen.getByText('Salário')).toBeInTheDocument();
+    // campo NÃO curado do emprego — nada é omitido
+    expect(screen.getByText('Matricula')).toBeInTheDocument();
+    // campo não curado da sociedade
+    expect(screen.getByText('Capital Social')).toBeInTheDocument();
+  });
+
+  it('mantém a seção "Conexões no mapa" injetada', () => {
+    render(<EntityDetail />);
+    fireEvent.click(screen.getByRole('button', { name: /Carreira & Negócios/ }));
+    expect(screen.getByText('Conexões no mapa')).toBeInTheDocument();
   });
 });
 
