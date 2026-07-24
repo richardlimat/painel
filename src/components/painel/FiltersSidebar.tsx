@@ -95,7 +95,7 @@ function FilterRow({
   );
 }
 
-export function FiltersSidebar({ open }: { open: boolean }) {
+export function FiltersSidebar({ open, onCollapse }: { open: boolean; onCollapse?: () => void }) {
   const filters = useGraphStore((s) => s.filters);
   const setFilters = useGraphStore((s) => s.setFilters);
   const resetFilters = useGraphStore((s) => s.resetFilters);
@@ -117,9 +117,23 @@ export function FiltersSidebar({ open }: { open: boolean }) {
     <aside className={`filters ${open ? 'open' : ''}`} id="filters">
       <div className="section-title">
         <b>Filtros da rede</b>
-        <button className="btn plain" style={{ padding: '2px 8px', fontSize: 11 }} onClick={resetFilters}>
-          Limpar
-        </button>
+        <div className="section-title-actions">
+          <button className="btn plain" style={{ padding: '2px 8px', fontSize: 11 }} onClick={resetFilters}>
+            Limpar
+          </button>
+          <button
+            type="button"
+            className="filters-collapse"
+            onClick={() => onCollapse?.()}
+            title="Recolher filtros"
+            aria-label="Recolher filtros"
+          >
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M13 6l-6 6 6 6" />
+              <path d="M18 6l-6 6 6 6" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <FilterRow

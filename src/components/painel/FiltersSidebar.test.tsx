@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FiltersSidebar } from './FiltersSidebar';
 import { useGraphStore, companyId } from '../../store/graphStore';
 import type { GraphNode } from '../../types/graph';
@@ -53,6 +53,13 @@ describe('FiltersSidebar', () => {
     expect(screen.getByText('CNAE Principal')).toBeInTheDocument();
     expect(screen.getByText('Abertas após')).toBeInTheDocument();
     expect(screen.getByText('Legenda')).toBeInTheDocument();
+  });
+
+  it('6. o botão "Recolher filtros" (dentro do quadro) dispara onCollapse', () => {
+    const onCollapse = vi.fn();
+    render(<FiltersSidebar open onCollapse={onCollapse} />);
+    fireEvent.click(screen.getByLabelText('Recolher filtros'));
+    expect(onCollapse).toHaveBeenCalledTimes(1);
   });
 
   describe('busca de CNAE digitável', () => {
