@@ -16,7 +16,7 @@ function unauthorizedResponse(): Response {
 
 /**
  * Valida a sessão do cookie contra `sessions`/`users`. Usado por toda rota
- * protegida: `/api/cadastro-pj-plus`, `/api/cpf-ultra`, `/api/saved-queries/*`.
+ * protegida: `/api/consulta-empresa`, `/api/consulta-pessoa`, `/api/saved-queries/*`.
  */
 export async function requireSession(req: Request): Promise<AuthResult> {
   const token = readSessionCookie(req);

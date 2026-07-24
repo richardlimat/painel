@@ -1,5 +1,6 @@
 import { isValidCPF, onlyDigits } from '../src/lib/format';
 import { requireSession } from './_lib/auth';
+import { diagnosticId, normalizeUnreachableError, normalizeUpstreamError } from './_lib/upstreamError';
 
 export const config = { runtime: 'edge' };
 
@@ -23,7 +24,7 @@ function jsonResponse(body: unknown, status: number): Response {
   });
 }
 
-/** Testável isoladamente (ver api/cpf-ultra.test.ts). Nunca lança — sempre retorna um resultado. */
+/** Testável isoladamente (ver api/consulta-pessoa.test.ts). Nunca lança — sempre retorna um resultado. */
 export function normalizeAndValidateCpf(rawBody: string): { ok: true; cpf: string } | { ok: false; message: string } {
   let parsed: unknown;
   try {
@@ -74,7 +75,10 @@ export default async function handler(req: Request): Promise<Response> {
 
   const authorization = process.env.APIFULL_AUTHORIZATION;
   if (!authorization) {
-    return jsonResponse({ code: 'missing_authorization', message: 'Credenciais de consulta não configuradas no servidor.' }, 500);
+    return jsonResponse(
+      { code: 'configuration_incomplete', message: 'Configuração interna incompleta.', id: diagnosticId() },
+      500,
+    );
   }
 
   const startedAt = Date.now();
@@ -91,19 +95,13 @@ export default async function handler(req: Request): Promise<Response> {
     });
   } catch (err) {
     const aborted = err instanceof Error && err.name === 'AbortError';
-    // Log de diagnóstico — nunca CPF, nunca Authorization, nunca corpo da resposta.
-    console.log('[apifull-proxy]', {
-      status: aborted ? 'timeout' : 'unreachable',
-      durationMs: Date.now() - startedAt,
-    });
-    return jsonResponse(
-      aborted
-        ? { code: 'upstream_timeout', message: 'A consulta excedeu o tempo limite.' }
-        : { code: 'upstream_unreachable', message: 'Não foi possível conectar ao serviço de consulta.' },
-      aborted ? 504 : 502,
-    );
+    return normalizeUnreachableError('apifull-proxy', startedAt, aborted ? 'timeout' : 'unreachable');
   } finally {
     clearTimeout(timeoutId);
+  }
+
+  if (!upstream.ok) {
+    return normalizeUpstreamError('apifull-proxy', upstream, startedAt);
   }
 
   const body = await upstream.text();
