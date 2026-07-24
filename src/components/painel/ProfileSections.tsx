@@ -392,6 +392,16 @@ function sourceIsEmpty(val: unknown): boolean {
   return isEmptyValue(val);
 }
 
+/**
+ * Espelha a decisão de `ProfileSectionView` (que retorna `null` quando a
+ * origem está vazia e a seção não é `alwaysShow`): permite a quem agrupa
+ * seções saber, de fora, se uma seção vai de fato renderizar algo — sem
+ * duplicar a regra.
+ */
+export function sectionHasContent(spec: SectionSpec, serviceResponse: Record<string, unknown>): boolean {
+  return spec.alwaysShow === true || !sourceIsEmpty(serviceResponse[spec.source]);
+}
+
 function countFor(val: unknown): number | undefined {
   return Array.isArray(val) ? val.length : undefined;
 }

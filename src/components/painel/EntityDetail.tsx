@@ -9,6 +9,13 @@ import { ImageLightbox } from './ImageLightbox';
 import { valueMatchesQuery } from './ProfileValue';
 import { ProfileSectionView } from './ProfileSections';
 import { PersonTimeline } from './PersonTimeline';
+import { CadastralPage } from './CadastralPage';
+import { ContactsPage } from './ContactsPage';
+import { FinancePage } from './FinancePage';
+import { CareerPage } from './CareerPage';
+import { CyberPage } from './CyberPage';
+import { PatrimonioPage } from './PatrimonioPage';
+import { PresencePage } from './PresencePage';
 import { fmtText } from '../../lib/profileFormat';
 import type { GraphLink, GraphNode } from '../../types/graph';
 
@@ -306,6 +313,61 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
               )
             ) : PROFILE_PAGES[activePage]?.name === 'Timeline' ? (
               <PersonTimeline items={Array.isArray(sr.linhaDoTempo) ? (sr.linhaDoTempo as unknown[]) : []} />
+            ) : PROFILE_PAGES[activePage]?.name === 'Cadastral & Civil' ? (
+              <CadastralPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Contatos & Endereços' ? (
+              <ContactsPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Financeiro & Consumo' ? (
+              <FinancePage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Cyber Sec & Vazamentos' ? (
+              <CyberPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Bens & Patrimônio' ? (
+              <PatrimonioPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Presença & Viagens' ? (
+              <PresencePage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+              />
+            ) : PROFILE_PAGES[activePage]?.name === 'Carreira & Negócios' ? (
+              <CareerPage
+                sections={activeSections}
+                serviceResponse={sr}
+                onOpenImage={setLightboxSrc}
+                onConsult={onConsult}
+                connectionsSlot={
+                  <section className="ef-section">
+                    <h3 className="ef-section-title">
+                      Conexões no mapa<span className="ef-count">{related.length}</span>
+                    </h3>
+                    <Connections related={related} onGo={onGo} />
+                  </section>
+                }
+              />
             ) : (
               <>
                 {activeSections.map((spec, i) => (
@@ -318,14 +380,6 @@ function PersonDetail({ node, onGo }: { node: GraphNode; onGo: (id: string) => v
                     onConsult={onConsult}
                   />
                 ))}
-                {PROFILE_PAGES[activePage]?.name === 'Carreira & Negócios' && (
-                  <section className="ef-section">
-                    <h3 className="ef-section-title">
-                      Conexões no mapa<span className="ef-count">{related.length}</span>
-                    </h3>
-                    <Connections related={related} onGo={onGo} />
-                  </section>
-                )}
               </>
             )}
           </div>
