@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FiltersSidebar } from './FiltersSidebar';
 import { useGraphStore, companyId } from '../../store/graphStore';
 import type { GraphNode } from '../../types/graph';
@@ -53,6 +53,24 @@ describe('FiltersSidebar', () => {
     expect(screen.getByText('CNAE Principal')).toBeInTheDocument();
     expect(screen.getByText('Abertas após')).toBeInTheDocument();
     expect(screen.getByText('Legenda')).toBeInTheDocument();
+  });
+
+  it('6. o botão "Recolher filtros" (dentro do quadro) dispara onToggle', () => {
+    const onToggle = vi.fn();
+    render(<FiltersSidebar open onToggle={onToggle} />);
+    fireEvent.click(screen.getByLabelText('Recolher filtros'));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it('7. recolhido, vira um trilho com botão de reabrir no mesmo lugar (dispara onToggle)', () => {
+    const onToggle = vi.fn();
+    render(<FiltersSidebar open={false} onToggle={onToggle} />);
+    // conteúdo do painel some; sobra o trilho para reabrir
+    expect(screen.queryByText('Estado (UF)')).not.toBeInTheDocument();
+    const rail = screen.getByLabelText('Expandir filtros da rede');
+    expect(rail).toBeInTheDocument();
+    fireEvent.click(rail);
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
   describe('busca de CNAE digitável', () => {
