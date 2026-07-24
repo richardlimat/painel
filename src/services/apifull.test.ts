@@ -36,9 +36,22 @@ describe('getApiFullProfile', () => {
     await expect(getApiFullProfile(VALID_CPF)).rejects.toBeInstanceOf(PersonNotFoundError);
   });
 
-  it('lança erro com mensagem específica em status de falha (ex.: 429)', async () => {
-    fetchMock.mockResolvedValue(jsonResponse({ message: 'muitas requisições' }, 429));
-    await expect(getApiFullProfile(VALID_CPF)).rejects.toThrow('Limite de requisições');
+  it('propaga a mensagem já neutralizada devolvida pela rota interna em status de falha (ex.: 429)', async () => {
+    fetchMock.mockResolvedValue(
+      jsonResponse({ code: 'rate_limited', message: 'Limite de requisições atingido. Tente novamente em instantes.', id: 'ab12cd34' }, 429),
+    );
+    await expect(getApiFullProfile(VALID_CPF)).rejects.toThrow('Limite de requisições atingido');
+  });
+
+  it('nunca expõe nome de fornecedor, saldo, chave ou endpoint mesmo se o corpo de erro vier fora do formato esperado', async () => {
+    fetchMock.mockResolvedValue(
+      new Response('upstream error: FonteData saldo insuficiente, chave sk_live_ABC em api.apifull.com.br', {
+        status: 500,
+      }),
+    );
+    await expect(getApiFullProfile(VALID_CPF)).rejects.toThrow(
+      'Não foi possível concluir a operação. Tente novamente em instantes.',
+    );
   });
 
   it('rejeita HTTP 200 sem status "sucesso" (erro de negócio, não fica em cache de perfil válido)', async () => {

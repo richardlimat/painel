@@ -65,14 +65,17 @@ A camada de dados é plugável (`src/services/provider.ts`):
 
 | Provedor | CNPJ → sócios | CPF → perfil + empresas |
 |---|---|---|
-| **FonteData** (`cadastro-pj-plus`) | ✅ | — |
-| **APIFull** (`cpf-ultra`) | — | ✅ (perfil completo + `sociedades[]`) |
+| **FonteData** (rota interna `/api/consulta-empresa`) | ✅ | — |
+| **APIFull** (rota interna `/api/consulta-pessoa`) | — | ✅ (perfil completo + `sociedades[]`) |
 
 Nenhuma chamada é feita direto do navegador para a FonteData/APIFull:
-`api/cadastro-pj-plus.ts` e `api/cpf-ultra.ts` (Vercel Edge Functions) atuam
-como proxy same-origin, repassando as consultas com `FONTEDATA_API_KEY` e
-`APIFULL_AUTHORIZATION` só no servidor. Isso evita bloqueio de CORS (as duas
-são APIs servidor-a-servidor) e mantém as chaves fora do bundle do cliente.
+`api/consulta-empresa.ts` e `api/consulta-pessoa.ts` (Vercel Edge Functions)
+atuam como proxy same-origin, repassando as consultas com
+`FONTEDATA_API_KEY` e `APIFULL_AUTHORIZATION` só no servidor, sob rotas com
+nome de negócio (nunca o nome do fornecedor ou o endpoint real dele). Isso
+evita bloqueio de CORS (as duas são APIs servidor-a-servidor), mantém as
+chaves fora do bundle do cliente e nunca expõe qual fornecedor está por trás
+de cada rota — ver "Neutralidade do frontend" abaixo.
 
 **Pipeline entre camadas:** CNPJ → FonteData → empresa + sócios (Camada 1) →
 ao avançar de camada, cada CPF da fronteira é consultado na APIFull → os
@@ -92,7 +95,7 @@ que faltou (o perfil já em cache não é rebuscado).
 
 ### ⚠️ Aviso de segurança — leia antes de configurar em produção
 
-**`/api/cadastro-pj-plus`, `/api/cpf-ultra` e `/api/saved-queries/*` exigem
+**`/api/consulta-empresa`, `/api/consulta-pessoa` e `/api/saved-queries/*` exigem
 sessão autenticada** (cookie `HttpOnly`/`SameSite=Lax`, `Secure` em
 produção — ver `api/_lib/auth.ts`). Login e sessão são tabelas próprias no
 Supabase (`users`/`sessions`, ver `supabase/migrations/`), **não** Supabase
@@ -109,6 +112,37 @@ Não há rate-limit nem controle de concorrência no servidor (exigiria
 KV/Redis, que este projeto não tem) — a mitigação adicional é client-side:
 cache por CPF/CNPJ, lotes com concorrência limitada, e uma confirmação antes
 de "Expandir Tudo" iniciar uma cascata grande de consultas pagas.
+
+### Neutralidade do frontend
+
+O produto se apresenta como próprio e independente: o navegador nunca recebe
+nome de fornecedor, a palavra "API" em texto técnico, saldo/créditos da
+conta, chave, endpoint externo, nome de modelo/SDK ou qualquer outro detalhe
+de infraestrutura — nem em texto visível, nem em mensagens de erro, nem em
+metadados/envelopes de resposta, nem no bundle compilado. Regra completa em
+`CLAUDE.md`. Resumo da arquitetura que garante isso:
+
+- **Fronteira server-only**: `src/services/apifull.ts`/`fontedata.ts`
+  chamam só as rotas internas neutras `/api/consulta-pessoa` e
+  `/api/consulta-empresa` — nunca o domínio real do fornecedor, nunca com a
+  chave. As credenciais (`FONTEDATA_API_KEY`, `APIFULL_AUTHORIZATION`) só
+  existem em `process.env`, lidas por `api/*.ts` (nunca `VITE_*`, nunca
+  importado por `src/`).
+- **Normalizador central de erros** (`api/_lib/upstreamError.ts`): nenhuma
+  falha do fornecedor é repassada crua ao navegador. O detalhe completo (só
+  status + request-id do upstream — nunca o corpo, que pode conter dado da
+  pessoa consultada) fica no log do servidor, correlacionável por um
+  identificador de diagnóstico curto devolvido ao cliente junto de uma
+  mensagem pública neutra em pt-BR (`{ code, message, id }`).
+- **Leitura segura no cliente** (`src/services/proxyError.ts`): mesmo que o
+  formato de erro mude inesperadamente, o cliente só aceita o campo
+  `message` de um JSON — nunca repassa texto cru/HTML/stack trace.
+- **Política automatizada** (`scripts/ui-policy/`): lista central de termos
+  proibidos, aplicada tanto ao código-fonte (`npm run check:ui-policy`)
+  quanto ao bundle compilado (`npm run check:ui-policy:static`, rode após
+  `npm run build`) — falha o CI se algo proibido aparecer, apontando arquivo
+  e linha. Nunca toca dado dinâmico pesquisado (resultados, nomes, links) —
+  só varre arquivos-fonte e o bundle estático.
 
 ## Rodando
 
@@ -161,8 +195,8 @@ api/
 ├── saved-queries/
 │   ├── index.ts            # GET lista / POST cria (snapshot + upload de imagens)
 │   └── [id].ts              # GET abre (signed URLs) / DELETE exclui (+ imagens do bucket)
-├── cadastro-pj-plus.ts     # Vercel Edge Function: proxy same-origin p/ FonteData (protegida por sessão)
-└── cpf-ultra.ts            # Vercel Edge Function: proxy same-origin p/ APIFull (protegida por sessão)
+├── consulta-empresa.ts     # Vercel Edge Function: proxy same-origin p/ FonteData (protegida por sessão)
+└── consulta-pessoa.ts      # Vercel Edge Function: proxy same-origin p/ APIFull (protegida por sessão)
 
 supabase/migrations/        # users, sessions, saved_queries, saved_query_images (RLS sem policies)
 

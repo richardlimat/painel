@@ -34,7 +34,7 @@ function resetStores() {
   useGraphStore.setState({
     // instância nova a cada teste — o cache interno do FonteDataProvider não
     // pode vazar entre testes que reusam os mesmos CNPJs de fixture.
-    providers: { fontedata: new FonteDataProvider() },
+    providers: { cadastral: new FonteDataProvider() },
     nodes: [],
     links: [],
     nodeIndex: new Map(),
@@ -102,7 +102,7 @@ describe('expandNode em nó pessoa (pipeline APIFull → FonteData)', () => {
 
   it('empresa descoberta via sociedades[] e todos os seus sócios entram na MESMA camada (não uma camada acima)', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return apiFullSuccess([
           {
             cnpj: NEW_CNPJ,
@@ -137,7 +137,7 @@ describe('expandNode em nó pessoa (pipeline APIFull → FonteData)', () => {
 
   it('relação Empresa→Pessoa da APIFull sobrevive mesmo se a FonteData falhar (não some, sem duplicar depois)', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return apiFullSuccess([
           {
             cnpj: NEW_CNPJ,
@@ -172,7 +172,7 @@ describe('expandNode em nó pessoa (pipeline APIFull → FonteData)', () => {
 
   it('não duplica a aresta quando a FonteData confirma a mesma pessoa depois (dedup por par, não por tipo)', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return apiFullSuccess([
           {
             cnpj: NEW_CNPJ,
@@ -204,7 +204,7 @@ describe('expandNode em nó pessoa (pipeline APIFull → FonteData)', () => {
     let fonteDataCallsForFailingCnpj = 0;
     let fonteDataCallsForNewCnpj = 0;
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return apiFullSuccess([
           { cnpj: NEW_CNPJ, qualificacao_socio_descricao: 'Sócio', documento_socio: PERSON_CPF, nome_socio: 'FULANO' },
           { cnpj: FAILING_CNPJ, qualificacao_socio_descricao: 'Sócio', documento_socio: PERSON_CPF, nome_socio: 'FULANO' },
@@ -239,7 +239,7 @@ describe('expandNode em nó pessoa (pipeline APIFull → FonteData)', () => {
     // sucesso anterior não foi reconsultado; APIFull não foi chamada de novo (cache)
     expect(fonteDataCallsForNewCnpj).toBe(1);
     expect(fonteDataCallsForFailingCnpj).toBe(2);
-    const apiFullCalls = fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/cpf-ultra')).length;
+    const apiFullCalls = fetchMock.mock.calls.filter((call) => String(call[0]).includes('/api/consulta-pessoa')).length;
     expect(apiFullCalls).toBe(1);
   });
 });
@@ -379,7 +379,7 @@ describe('prefetch automático de perfis via APIFull (fila de segundo plano)', (
 
   it('4. startSearch dispara prefetch automático dos sócios pessoa física em segundo plano', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         apiFullCallCount += 1;
         return apiFullSuccess([]);
       }
@@ -402,7 +402,7 @@ describe('prefetch automático de perfis via APIFull (fila de segundo plano)', (
 
   it('10. prefetch nunca altera o grafo — só popula o cache de perfis, nunca adiciona nós/camadas', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         // o perfil pré-carregado já revela uma NOVA empresa em sociedades[] — isso
         // não pode aparecer no grafo antes do usuário clicar '+'.
         return apiFullSuccess([
@@ -433,7 +433,7 @@ describe('prefetch automático de perfis via APIFull (fila de segundo plano)', (
 
   it('11. próxima camada reaproveita o perfil já pré-carregado — não rechama a APIFull pro mesmo CPF', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         apiFullCallCount += 1;
         return apiFullSuccess([]); // sem sociedades novas — só testa reaproveitamento do perfil
       }
@@ -453,7 +453,7 @@ describe('prefetch automático de perfis via APIFull (fila de segundo plano)', (
 
   it('12. sócios de uma empresa recém-mesclada na camada seguinte já são enfileirados automaticamente', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         apiFullCallCount += 1;
         if (apiFullCallCount === 1) {
           // 1ª chamada: perfil do sócio original, que revela uma nova empresa (CNPJ_2)
@@ -520,7 +520,7 @@ describe('startSearch — mapa só abre após o lote da APIFull; sem race condit
       if (url.includes(`CNPJ=${CNPJ_RACE_B}`)) {
         return fonteDataCompany(CNPJ_RACE_B, []);
       }
-      if (url.includes('/api/cpf-ultra')) return apiFullSuccess([]);
+      if (url.includes('/api/consulta-pessoa')) return apiFullSuccess([]);
       return jsonResponse({ message: 'unexpected' }, 404);
     });
 
@@ -540,7 +540,7 @@ describe('startSearch — mapa só abre após o lote da APIFull; sem race condit
   it('2. mapa (rootId) permanece oculto enquanto o lote de perfis da APIFull não termina', async () => {
     let resolveProfile: (() => void) | undefined;
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return new Promise((resolve) => {
           resolveProfile = () => resolve(apiFullSuccess([]));
         });
@@ -566,7 +566,7 @@ describe('startSearch — mapa só abre após o lote da APIFull; sem race condit
 
   it('3. falha em CPF do lote inicial não abre o mapa — fica em awaiting-decision, mas não interrompe os demais', async () => {
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
         if (body.cpf === PERSON_CPF) return jsonResponse({ message: 'erro' }, 500);
         return apiFullSuccess([]);
@@ -591,7 +591,7 @@ describe('startSearch — mapa só abre após o lote da APIFull; sem race condit
 
   it('4. continueWithAvailableData libera o mapa mesmo com falhas pendentes', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) return jsonResponse({ message: 'erro' }, 500);
+      if (url.includes('/api/consulta-pessoa')) return jsonResponse({ message: 'erro' }, 500);
       if (url.includes(`CNPJ=${NEW_CNPJ}`)) {
         return fonteDataCompany(NEW_CNPJ, [{ nome: 'FULANO DE TAL', cargo: 'Sócio', documento: PERSON_CPF }]);
       }
@@ -609,7 +609,7 @@ describe('startSearch — mapa só abre após o lote da APIFull; sem race condit
   it('5. retryFailedSearchProfiles reprocessa só os CPFs que falharam e libera o mapa quando todos passam', async () => {
     let apifullCalls = 0;
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         apifullCalls += 1;
         if (apifullCalls === 1) return jsonResponse({ message: 'erro' }, 500);
         return apiFullSuccess([]);
@@ -646,7 +646,7 @@ describe('startPersonSearch — Consulta Avançada (busca por CPF)', () => {
 
   it('1. CPF sem sociedades abre o mapa só com o nó pessoa (label = CPF formatado)', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) return apiFullSuccess([]);
+      if (url.includes('/api/consulta-pessoa')) return apiFullSuccess([]);
       return jsonResponse({ message: 'unexpected' }, 404);
     });
 
@@ -663,7 +663,7 @@ describe('startPersonSearch — Consulta Avançada (busca por CPF)', () => {
 
   it('2. CPF com sociedades cria os nós placeholder, enriquece via FonteData e abre o mapa', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return apiFullSuccess([
           {
             cnpj: NEW_CNPJ,
@@ -697,7 +697,7 @@ describe('startPersonSearch — Consulta Avançada (busca por CPF)', () => {
 
   it('3. falha ao buscar o perfil do CPF raiz não abre o mapa', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) return jsonResponse({ message: 'erro' }, 500);
+      if (url.includes('/api/consulta-pessoa')) return jsonResponse({ message: 'erro' }, 500);
       return jsonResponse({ message: 'unexpected' }, 404);
     });
 
@@ -711,7 +711,7 @@ describe('startPersonSearch — Consulta Avançada (busca por CPF)', () => {
 
   it('4. falha parcial no enriquecimento de uma sociedade ainda assim abre o mapa, com a pessoa não-expandida', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return apiFullSuccess([
           {
             cnpj: NEW_CNPJ,
@@ -753,7 +753,7 @@ describe('startPersonSearch — Consulta Avançada (busca por CPF)', () => {
     // que não passa por essa fila (mesmo padrão do teste equivalente de startSearch).
     let resolveCompanyA: (() => void) | undefined;
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
         if (body.cpf === PERSON_CPF) {
           return apiFullSuccess([
@@ -800,7 +800,7 @@ describe('foto da pessoa — atualiza o nó automaticamente quando o perfil reso
 
   it('1. perfil resolvido durante a expansão da pessoa atualiza photoUrl do nó', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return jsonResponse({
           status: 'sucesso',
           dados: { SERVICE_RESPONSE: { cadastral: { foto: 'https://cdn.example.com/foto.jpg' }, sociedades: [] } },
@@ -817,7 +817,7 @@ describe('foto da pessoa — atualiza o nó automaticamente quando o perfil reso
 
   it('2. perfil resolvido tardiamente (ex.: usuário abre o painel depois do mapa montado) também atualiza o nó', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return jsonResponse({
           status: 'sucesso',
           dados: { SERVICE_RESPONSE: { fotos: ['https://cdn.example.com/tardia.jpg'] } },
@@ -862,7 +862,7 @@ describe('buildSnapshot / hydrateFromSnapshot — salvar e reabrir consulta sem 
 
   it('2. buildSnapshot inclui grafo + perfis sanitizados, mas nunca photoUrl cru nem campos hard', async () => {
     fetchMock.mockImplementation(async (url: string) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         return jsonResponse({
           status: 'sucesso',
           dados: {
@@ -932,7 +932,7 @@ describe('nextLayer — aguarda só o lote de CPFs da própria camada (não a fi
   it('1. layerLoading permanece true até o sócio de uma empresa descoberta em cascata terminar (não só a fronteira original)', async () => {
     let resolveCascadeProfile: (() => void) | undefined;
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
         if (body.cpf === PERSON_CPF) {
           return apiFullSuccess([
@@ -979,7 +979,7 @@ describe('nextLayer — aguarda só o lote de CPFs da própria camada (não a fi
     const UNRELATED_CPF = '39053344705';
     let resolveCascadeProfile: (() => void) | undefined;
     fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url.includes('/api/cpf-ultra')) {
+      if (url.includes('/api/consulta-pessoa')) {
         const body = JSON.parse(String(init?.body ?? '{}')) as { cpf?: string };
         if (body.cpf === PERSON_CPF) {
           return apiFullSuccess([

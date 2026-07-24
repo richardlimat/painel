@@ -6,10 +6,12 @@ description: Build, launch and drive the Painel Societário graph app end-to-end
 # Verificando o Painel Societário
 
 App Vite + React (SPA) com duas Vercel Edge Functions como proxy same-origin:
-`api/cadastro-pj-plus.ts` (FonteData, CNPJ→sócios) e `api/cpf-ultra.ts`
-(APIFull, perfil de pessoa + `sociedades[]`). **Nenhuma das duas tem
-controle de acesso** — ver aviso de segurança no README antes de testar num
-deployment real/exposto. Superfície: navegador.
+`api/consulta-empresa.ts` (FonteData, CNPJ→sócios) e `api/consulta-pessoa.ts`
+(APIFull, perfil de pessoa + `sociedades[]`) — rotas internas de nome
+neutro; o navegador nunca vê o nome do fornecedor, chave, saldo/créditos ou
+endpoint real (ver `CLAUDE.md`, seção "Neutralidade do frontend", e rode
+`npm run check:ui-policy` / `check:ui-policy:static` se mexer em texto
+voltado ao usuário). Superfície: navegador.
 
 ## Build e launch
 
@@ -39,8 +41,9 @@ recursivo, detecção de Base64) — não depende de rede nem de chave.
 Scripts .mjs fora do repo precisam de um symlink para `node_modules` (ESM ignora NODE_PATH).
 
 Sem rede externa/chaves configuradas, toda consulta falha ("Failed to fetch"
-se `/api/*` não existe no servidor atual, ou "Chave... ausente ou inválida"
-se a function responde mas a variável não está configurada). Não há CNPJ/CPF
+se `/api/*` não existe no servidor atual, ou "Configuração interna
+incompleta" — mensagem neutra, sem nome de fornecedor — se a function
+responde mas a variável não está configurada). Não há CNPJ/CPF
 fictício determinístico para smoke test — qualquer teste real consome
 créditos pagos das duas APIs, então minimize repetições.
 

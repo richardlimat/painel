@@ -5,7 +5,7 @@
  * Como o projeto não tem autenticação, qualquer pessoa com acesso ao painel
  * pode clicar em "Revelar" nos campos "soft", e o JSON completo (mascarado
  * ou não) já está visível na aba Network do navegador e via chamada direta
- * a `/api/cpf-ultra`, sem passar pela interface. Ver README.
+ * a `/api/consulta-pessoa`, sem passar pela interface. Ver README.
  *
  * Classificação por PALAVRA normalizada (minúsculo, sem acento, camelCase e
  * snake_case separados em palavras) — evita falsos positivos de substring

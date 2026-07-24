@@ -25,7 +25,7 @@ import { usePersonProfileStore } from './personProfileStore';
 import { extractPersonPhotoUrl } from '../lib/personPhoto';
 import { stripHardFields } from '../lib/mask';
 
-export type ProviderMode = 'fontedata';
+export type ProviderMode = 'cadastral';
 
 /**
  * Snapshot necessário para reabrir uma consulta salva sem chamar
@@ -457,7 +457,7 @@ async function processPendingSociedades(
   for (let i = 0; i < cnpjs.length; i += SOCIEDADES_BATCH_SIZE) {
     if (get().graphEpoch !== epoch) break;
     const batch = cnpjs.slice(i, i + SOCIEDADES_BATCH_SIZE);
-    const results = await Promise.allSettled(batch.map((cnpj) => get().providers.fontedata.getCompany(cnpj)));
+    const results = await Promise.allSettled(batch.map((cnpj) => get().providers.cadastral.getCompany(cnpj)));
     if (get().graphEpoch !== epoch) break;
     results.forEach((res, idx) => {
       const cnpj = batch[idx];
@@ -551,8 +551,8 @@ async function expandPersonViaProfile(
 const initialForce = loadForceSettings();
 
 export const useGraphStore = create<GraphState>((set, get) => ({
-  providerMode: 'fontedata',
-  providers: { fontedata: new FonteDataProvider() },
+  providerMode: 'cadastral',
+  providers: { cadastral: new FonteDataProvider() },
   nodes: [],
   links: [],
   nodeIndex: new Map(),
@@ -891,10 +891,10 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       (n) => n.kind === 'person' && !n.expanded && n.depth < maxDepth,
     ).length;
     if (pendingPeopleCount > 0) {
-      // "Expandir Tudo" pode disparar uma cascata de consultas pagas — confirmação
-      // explícita antes de gastar créditos sem o usuário pedir uma pessoa por vez.
+      // "Expandir Tudo" pode disparar uma cascata de consultas — confirmação
+      // explícita antes de consultar várias pessoas sem o usuário pedir uma por vez.
       const confirmed = window.confirm(
-        `"Expandir Tudo" vai consultar dados para ${pendingPeopleCount} pessoa(s) (e possivelmente novas empresas) — isso consome créditos pagos e pode continuar em cascata por várias camadas. Deseja continuar?`,
+        `"Expandir Tudo" vai consultar dados para ${pendingPeopleCount} pessoa(s) (e possivelmente novas empresas) e pode continuar em cascata por várias camadas. Deseja continuar?`,
       );
       if (!confirmed) return;
     }
@@ -911,7 +911,7 @@ export const useGraphStore = create<GraphState>((set, get) => ({
       }
       if (apiFullCallsThisRun >= MAX_APIFULL_CALLS_PER_EXPAND_ALL) {
         set({
-          notice: `Expansão interrompida após ${MAX_APIFULL_CALLS_PER_EXPAND_ALL} consultas novas nesta execução (limite de custo). Use "+" para continuar manualmente.`,
+          notice: `Expansão interrompida após ${MAX_APIFULL_CALLS_PER_EXPAND_ALL} consultas novas nesta execução (limite desta execução). Use "+" para continuar manualmente.`,
         });
         break;
       }

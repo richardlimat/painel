@@ -1,10 +1,10 @@
 import { isValidCNPJ, isValidCPF, onlyDigits } from '../lib/format';
-import { extractErrorDetail } from './fontedata';
+import { readNeutralErrorMessage } from './proxyError';
 
 /**
- * Perfil completo devolvido pela APIFull (cpf-ultra). `SERVICE_RESPONSE` é
- * preservado integralmente — a API pode adicionar novas seções no futuro e
- * nenhuma chave é descartada aqui.
+ * Perfil completo devolvido pela rota interna de consulta de pessoa.
+ * `SERVICE_RESPONSE` é preservado integralmente — a origem pode adicionar
+ * novas seções no futuro e nenhuma chave é descartada aqui.
  */
 export interface ApiFullProfile {
   SERVICE_RESPONSE: Record<string, unknown>;
@@ -28,30 +28,6 @@ export class PersonNotFoundError extends Error {
   }
 }
 
-function messageForStatus(status: number, detail: string | undefined): string {
-  const suffix = detail ? ` Detalhe: ${detail}` : '';
-  switch (status) {
-    case 400:
-      return `CPF ou parâmetro inválido.${suffix}`;
-    case 401:
-    case 403:
-      return `Chave de API ausente ou inválida (configuração do servidor).${suffix}`;
-    case 402:
-      return `Saldo insuficiente para consulta.${suffix}`;
-    case 413:
-      return `Requisição rejeitada pelo servidor (corpo excede o tamanho permitido).${suffix}`;
-    case 429:
-      return `Limite de requisições excedido. Tente novamente em instantes.${suffix}`;
-    case 502:
-      return `Não foi possível conectar ao serviço de consulta.${suffix}`;
-    case 504:
-      return `A consulta excedeu o tempo limite.${suffix}`;
-    default:
-      if (status >= 500 && status <= 503) return `Serviço de consulta indisponível no momento.${suffix}`;
-      return `Falha na consulta (HTTP ${status})${suffix}`;
-  }
-}
-
 function isValidApiFullBody(
   data: unknown,
 ): data is { status: string; dados: { SERVICE_RESPONSE: Record<string, unknown> } } {
@@ -65,10 +41,13 @@ function isValidApiFullBody(
 }
 
 /**
- * Consulta o perfil completo de uma pessoa via APIFull (cpf-ultra), através
- * do proxy same-origin `/api/cpf-ultra` — a chave nunca chega ao cliente.
- * Sem cache aqui: o cache/dedup mora em `personProfileStore`, compartilhado
- * entre o clique no painel e a expansão de camada.
+ * Consulta o perfil completo de uma pessoa através da rota interna
+ * `/api/consulta-pessoa` — nenhuma credencial ou detalhe de origem chega ao
+ * cliente. Erros do servidor já vêm neutralizados (ver
+ * `api/_lib/upstreamError.ts`); `readNeutralErrorMessage` nunca repassa texto
+ * cru mesmo que o formato mude inesperadamente. Sem cache aqui: o
+ * cache/dedup mora em `personProfileStore`, compartilhado entre o clique no
+ * painel e a expansão de camada.
  */
 export async function getApiFullProfile(cpf: string): Promise<ApiFullProfile> {
   const digits = onlyDigits(cpf);
@@ -76,7 +55,7 @@ export async function getApiFullProfile(cpf: string): Promise<ApiFullProfile> {
     throw new Error('CPF inválido: informe um CPF com 11 dígitos e dígitos verificadores válidos.');
   }
 
-  const res = await fetch('/api/cpf-ultra', {
+  const res = await fetch('/api/consulta-pessoa', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ cpf: digits }),
@@ -84,15 +63,14 @@ export async function getApiFullProfile(cpf: string): Promise<ApiFullProfile> {
 
   if (res.status === 404) throw new PersonNotFoundError(digits);
   if (!res.ok) {
-    const detail = await extractErrorDetail(res);
-    throw new Error(messageForStatus(res.status, detail));
+    throw new Error(await readNeutralErrorMessage(res));
   }
 
   let data: unknown;
   try {
     data = await res.json();
   } catch {
-    throw new Error('Resposta inesperada da consulta (endpoint indisponível).');
+    throw new Error('Não foi possível processar a resposta da consulta.');
   }
 
   if (!isValidApiFullBody(data)) {
