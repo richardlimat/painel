@@ -481,33 +481,6 @@
   overflow: hidden;
   transition: background 0.3s;
 }
-.crumb {
-  position: absolute;
-  z-index: 6;
-  /* abaixo do controle de camadas e do botão de configuração do mapa */
-  top: 106px;
-  left: 16px;
-  color: #374151;
-  font-size: 11px;
-  display: flex;
-  gap: 9px;
-  align-items: center;
-  max-width: 60%;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-.crumb button {
-  border: 0;
-  background: transparent;
-  color: inherit;
-  padding: 2px 4px;
-  font-size: 11px;
-}
-.crumb .last {
-  color: var(--canvas-text);
-  opacity: 0.78;
-  font-weight: 700;
-}
 .level {
   position: absolute;
   z-index: 6;
@@ -1373,10 +1346,6 @@
   }
   .details.open {
     transform: translateX(0);
-  }
-  .crumb {
-    left: 16px;
-    max-width: 75%;
   }
   .rf-entity {
     transform: scale(0.92);
